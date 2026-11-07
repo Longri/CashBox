@@ -1,0 +1,32 @@
+name: cashbox-localdb
+
+services:
+  db:
+    image: mariadb:11.4
+    container_name: cashbox-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+      MARIADB_DATABASE: ${DB_NAME:-cashbox}
+      MARIADB_USER: ${DB_USER:-cashbox}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-cashbox}
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+    ports:
+      # Nur an localhost binden - die DB soll nicht im LAN hängen
+      - "127.0.0.1:${DB_PORT:-3306}:3306"
+    volumes:
+      - cashbox-db-data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  cashbox-db-data:

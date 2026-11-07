@@ -22,3 +22,34 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# --- Maven / IDE ---
+/target/
+.idea/
+.vscode/
+.settings
+.project
+.classpath
+*.iml
+.DS_Store
+
+# --- Vaadin: generiert vom vaadin-maven-plugin ---
+node_modules/
+src/main/frontend/generated/
+src/main/bundles/
+pnpmfile.js
+vite.generated.ts
+webpack.generated.js
+package.json
+package-lock.json
+pnpm-lock.yaml
+tsconfig.json
+types.d.ts
+vite.config.ts
+.vaadin/
+vaadin.lock
+drivers/
+error-screenshots/
+
+# --- Secrets ---
+.env
