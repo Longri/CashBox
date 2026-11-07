@@ -1,2 +1,8 @@
 # CashBox
-CashBox – Java/Spring-Boot-App zur Verwaltung eines realen Sparkontos mit virtuellen Spartöpfen (Sparzielen). Alle Ein-, Aus- und Umbuchungen werden als unveränderliche Buchungen protokolliert, nicht zugeordnetes Geld bleibt im Puffer. Konsistenzprüfung in App und Datenbank. Stack: Spring Boot, JPA/Hibernate, MariaDB 11, Docker Compose.
+CashBox ist eine Java/Spring-Boot-Anwendung, mit der sich das Guthaben eines realen
+Sparkontos auf virtuelle Spartöpfe (Sparziele) verteilen lässt. Jede Ein-, Aus- und
+Umbuchung wird als unveränderliche Buchung protokolliert; nicht zugeordnetes Geld
+bleibt in einem Puffer. Die Konsistenz (Kontostand = Puffer + Summe der Sparziele)
+wird sowohl in der Anwendung als auch in der Datenbank geprüft.
+
+Stack: Java, Spring Boot, JPA/Hibernate, MariaDB 11, Docker Compose (inkl. Adminer)
