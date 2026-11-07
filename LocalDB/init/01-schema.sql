@@ -38,8 +38,9 @@ CREATE TABLE account (
     -- Geld, das noch keinem Sparziel zugewiesen ist
     unassigned_buffer  DECIMAL(19,2)   NOT NULL DEFAULT 0.00,
 
-    -- Optimistic Locking (@Version)
-    version            BIGINT          NULL,
+    -- Optimistic Locking (@Version). NOT NULL DEFAULT 0: Hibernate kann eine
+    -- NULL-Version nicht hochzählen (z. B. bei Zeilen, die per Adminer angelegt wurden).
+    version            BIGINT          NOT NULL DEFAULT 0,
 
     PRIMARY KEY (id),
     CONSTRAINT chk_account_balance_not_negative
@@ -79,7 +80,8 @@ CREATE TABLE savings_goal (
     -- ACTIVE | REACHED | PAUSED  (EnumType.STRING)
     status           VARCHAR(20)     NOT NULL DEFAULT 'ACTIVE',
 
-    version          BIGINT          NULL,
+    -- Optimistic Locking (@Version), siehe account.version
+    version          BIGINT          NOT NULL DEFAULT 0,
 
     PRIMARY KEY (id),
     CONSTRAINT fk_goal_account

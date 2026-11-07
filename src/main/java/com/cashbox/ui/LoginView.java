@@ -13,8 +13,9 @@ import com.vaadin.flow.server.auth.AnonymousAllowed;
 
 /**
  * Anmeldedialog. Das Formular wird per POST an /login (Spring Security) gesendet.
+ * {@code autoLayout = false}: ohne {@link MainLayout} (keine Navigation/Abmelden vor dem Login).
  */
-@Route("login")
+@Route(value = "login", autoLayout = false)
 @PageTitle("Anmelden | CashBox")
 @AnonymousAllowed
 public class LoginView extends VerticalLayout implements BeforeEnterObserver {
