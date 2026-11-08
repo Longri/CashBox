@@ -1,0 +1,11 @@
+# Nur das, was der Build braucht, kommt in den Build-Kontext.
+# Vor allem landen .env-Dateien (Passwörter) so nie im Image.
+*
+!mvnw
+!.mvn/
+!pom.xml
+!src/
+
+# Von Vaadin erzeugt, wird beim Build neu erstellt
+src/main/frontend/generated/
+src/main/bundles/

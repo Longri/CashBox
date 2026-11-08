@@ -173,6 +173,8 @@ class DashboardViewTest extends SpringBrowserlessTest {
 
     @Test
     void bufferWithdrawalCannotExceedBuffer() {
+        // Bei leerem Puffer (frische Datenbank) wäre das Ausbuchen gesperrt bzw. ein Sparziel vorgewählt
+        service.deposit(new BigDecimal("20"), null, null);
         test($(Button.class).withId("withdraw").single()).click();
         test($(Select.class).withId("booking-source").single()).selectItem(Pot.BUFFER_NAME);
         TextField amount = $(TextField.class).withId("booking-amount").single();
@@ -189,6 +191,8 @@ class DashboardViewTest extends SpringBrowserlessTest {
         Account account = accounts.findFirstByOrderByIdAsc().orElseThrow();
         SavingsGoal goal = goals.save(new SavingsGoal(account, "Test-Ziel-" + System.nanoTime(), new BigDecimal("100.00")));
         service.deposit(new BigDecimal("42"), goal.getId(), null);
+        // Puffer nicht leer, damit der Dialog wie gewohnt beim Puffer startet (frische Datenbank)
+        service.deposit(new BigDecimal("5"), null, null);
         BigDecimal balanceBefore = service.getOverview().balance();
 
         test($(Button.class).withId("withdraw").single()).click();

@@ -19,8 +19,8 @@ services:
       # Nur an localhost binden - die DB soll nicht im LAN hängen
       - "127.0.0.1:${DB_PORT:-3306}:3306"
     volumes:
+      # Tabellen legt die Anwendung beim Start selbst an (Flyway, src/main/resources/db/migration)
       - cashbox-db-data:/var/lib/mysql
-      - ./init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s

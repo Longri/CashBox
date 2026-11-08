@@ -1,10 +1,11 @@
 -- =====================================================================
---  Spar-App - Datenbankschema (MariaDB 11.x)
+--  CashBox - Ausgangsschema (MariaDB 11.x), Flyway-Migration V1
 --
---  Abgeleitet aus den JPA-Entitäten:
---    de.sparapp.model.Account
---    de.sparapp.model.SavingsGoal
---    de.sparapp.model.Booking
+--  Flyway spielt dieses Skript beim Start der Anwendung genau einmal in eine
+--  leere Datenbank ein. Bereits eingespielte Migrationen NIE ändern (Flyway
+--  prüft Prüfsummen) - Schemaänderungen kommen als neue Datei V2__..., V3__...
+--
+--  Abgeleitet aus den JPA-Entitäten in com.cashbox.model
 --
 --  Invariante (im Service zu prüfen, nicht per DB erzwingbar):
 --    account.current_balance = account.unassigned_buffer
@@ -17,14 +18,6 @@
 -- =====================================================================
 
 SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
-
-DROP TABLE IF EXISTS booking;
-DROP TABLE IF EXISTS savings_goal_image;
-DROP TABLE IF EXISTS savings_goal;
-DROP TABLE IF EXISTS account;
-
-SET FOREIGN_KEY_CHECKS = 1;
 
 -- ---------------------------------------------------------------------
 --  account - das eine reale Sparkonto (Single Source of Truth)

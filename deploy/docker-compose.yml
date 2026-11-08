@@ -1,0 +1,57 @@
+# CashBox im Betrieb: Anwendung + MariaDB.
+#
+#   cp .env.example .env     # Passwörter setzen!
+#   docker compose up -d
+#
+# Danach läuft CashBox auf http://<server>:8080 (Port über CASHBOX_PORT änderbar).
+# Die Tabellen legt die Anwendung beim ersten Start selbst an; Updates mit
+#   docker compose pull && docker compose up -d
+name: cashbox
+
+services:
+  app:
+    image: ghcr.io/longri/cashbox:${CASHBOX_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mariadb://db:3306/cashbox?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+      DB_USER: cashbox
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD in .env setzen}
+      ADMIN_USER: ${ADMIN_USER:?ADMIN_USER in .env setzen}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD in .env setzen}
+      REMEMBER_ME_DAYS: ${REMEMBER_ME_DAYS:-14}
+      # Zeitzone für "heute" (z. B. frühestes Wunschdatum) und den nächtlichen Aufräumjob
+      TZ: ${TZ:-Europe/Berlin}
+      # Hinter einem Reverse-Proxy (HTTPS): X-Forwarded-* auswerten, damit Weiterleitungen
+      # und Cookies https verwenden. Ohne Proxy unschädlich.
+      SERVER_FORWARD_HEADERS_STRATEGY: native
+    ports:
+      - "${CASHBOX_PORT:-8080}:8080"
+
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD in .env setzen}
+      MARIADB_DATABASE: cashbox
+      MARIADB_USER: cashbox
+      MARIADB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD in .env setzen}
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+    # Kein Port nach außen: Die Datenbank ist nur für die Anwendung im Compose-Netz erreichbar.
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  db-data:

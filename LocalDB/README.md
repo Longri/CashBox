@@ -16,20 +16,14 @@ MariaDB: `localhost:3306`, Benutzer `cashbox` / Passwort `cashbox`, Datenbank `c
 JDBC-URL: `jdbc:mariadb://localhost:3306/cashbox`
 
 Werte lassen sich über `.env` (Vorlage: `.env.example`) ändern.
-Beim ersten Start (leeres Volume) legt MariaDB Datenbank, Tabellen, Constraints, die View
-`v_account_consistency` und das Startkonto „Sparbuch" automatisch über `init/01-schema.sql` an.
-Das Skript läuft **nur bei leerem Volume**. Nach Schema-Änderungen:
 
-```bash
-docker compose down -v && docker compose up -d
-```
+## Schema
+Die Datenbank startet leer. Tabellen, Constraints, die View `v_account_consistency` und das
+Startkonto „Sparbuch" legt die Anwendung beim ersten Start selbst an (Flyway, Skripte unter
+`src/main/resources/db/migration`). Flyway merkt sich in der Tabelle `flyway_schema_history`,
+was schon eingespielt ist, und spielt bei jedem Start nur neue Skripte nach.
 
-Wer seine Daten behalten will, spielt stattdessen die passenden Skripte aus `migrations/`
-ein (mehrfach ausführbar):
-
-```bash
-docker exec -i cashbox-db mariadb -ucashbox -pcashbox cashbox < migrations/002-goal-icon.sql
-docker exec -i cashbox-db mariadb -ucashbox -pcashbox cashbox < migrations/003-remember-me.sql
-```
+Schemaänderung: neue Datei `V2__kurze_beschreibung.sql` (dann `V3__…`) anlegen. Bereits
+eingespielte Dateien nie mehr ändern, sonst bricht der Start mit einem Prüfsummenfehler ab.
 
 Hibernate läuft mit `ddl-auto=validate` und prüft das Schema nur gegen.
