@@ -7,6 +7,9 @@ wird sowohl in der Anwendung als auch in der Datenbank geprüft.
 
 Stack: Java 21, Spring Boot, Vaadin, JPA/Hibernate, Flyway, MariaDB 11, Docker
 
+Ausführliche Anleitung mit Screenshots, von der Installation bis zur Bedienung:
+**[Handbuch](docs/Handbuch.md)**
+
 - [Installation auf einem Server](#installation-auf-einem-server)
 - [Betrieb: Update, Backup, Wiederherstellen](#betrieb)
 - [Entwicklung](#entwicklung)
