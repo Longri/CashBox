@@ -290,6 +290,51 @@ html.goal-sorting * {
   white-space: pre-line;
 }
 
+/* ------------------------------------------------------------------ Einstellungen */
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lumo-space-m);
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--lumo-space-m);
+  border-radius: var(--lumo-border-radius-l);
+  background: var(--lumo-contrast-5pct);
+}
+
+.settings-section__title {
+  margin: 0;
+  font-size: var(--lumo-font-size-l);
+}
+
+/* Theme-Option: Name, darunter eine kurze Beschreibung */
+.settings-option {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-option__name {
+  font-weight: 600;
+}
+
+.settings-option__description {
+  color: var(--lumo-secondary-text-color);
+  font-size: var(--lumo-font-size-s);
+}
+
+/* Farbschema-Option: Symbol vor dem Text */
+.settings-option--inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lumo-space-xs);
+}
+
+.settings-option__icon {
+  width: 1em;
+  height: 1em;
+}
+
 /* ------------------------------------------------------------------ Sparziel-Symbol */
 
 /* Rundes Symbol bzw. eigenes Bild eines Sparziels (GoalAvatar) */

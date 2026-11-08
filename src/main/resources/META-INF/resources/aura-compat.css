@@ -1,0 +1,52 @@
+/*
+ * Nur zusammen mit Aura geladen (siehe ThemeFamily.AURA).
+ *
+ * styles.css und einige Views bauen auf den Lumo-Variablen auf. Aura definiert sie nicht,
+ * darum werden hier genau die benutzten auf Aura-Werte abgebildet. Farben laufen über
+ * Auras light-dark()-Werte und passen so zu hell, dunkel und automatisch.
+ */
+:root {
+  /* Abstände */
+  --lumo-space-xs: var(--vaadin-gap-xs);
+  --lumo-space-s: var(--vaadin-gap-s);
+  --lumo-space-m: var(--vaadin-gap-m);
+  --lumo-space-l: var(--vaadin-gap-l);
+
+  /* Ecken */
+  --lumo-border-radius-m: var(--vaadin-radius-m);
+  --lumo-border-radius-l: var(--vaadin-radius-l);
+
+  /* Schrift */
+  --lumo-font-size-xs: var(--aura-font-size-xs);
+  --lumo-font-size-s: var(--aura-font-size-s);
+  --lumo-font-size-l: var(--aura-font-size-l);
+  --lumo-font-size-xl: var(--aura-font-size-xl);
+  --lumo-font-size-xxl: round(var(--aura-font-size-xl) * 1.375, 0.0625rem);
+
+  /* Text */
+  --lumo-body-text-color: var(--vaadin-text-color);
+  --lumo-secondary-text-color: var(--vaadin-text-color-secondary);
+  --lumo-tertiary-text-color: var(--vaadin-text-color-disabled);
+
+  /* Flächen und Schatten */
+  --lumo-base-color: var(--vaadin-background-color);
+  --lumo-contrast-5pct: color-mix(in srgb, var(--vaadin-text-color) 5%, transparent);
+  --lumo-contrast-10pct: color-mix(in srgb, var(--vaadin-text-color) 10%, transparent);
+  --lumo-contrast-20pct: color-mix(in srgb, var(--vaadin-text-color) 20%, transparent);
+  --lumo-box-shadow-xs: var(--aura-shadow-xs);
+  --lumo-box-shadow-m: var(--aura-shadow-m);
+
+  /* Akzentfarbe */
+  --lumo-primary-color: var(--aura-accent-color);
+  --lumo-primary-text-color: var(--aura-accent-text-color);
+  --lumo-primary-color-10pct: color-mix(in srgb, var(--aura-accent-color) 10%, transparent);
+  --lumo-primary-color-50pct: color-mix(in srgb, var(--aura-accent-color) 50%, transparent);
+
+  /* Hinweise */
+  --lumo-error-text-color: var(--aura-red-text);
+  --lumo-error-color-10pct: color-mix(in srgb, var(--aura-red) 10%, transparent);
+  --lumo-success-text-color: var(--aura-green-text);
+  --lumo-success-color-10pct: color-mix(in srgb, var(--aura-green) 10%, transparent);
+  --lumo-warning-text-color: var(--aura-orange-text);
+  --lumo-warning-color-10pct: color-mix(in srgb, var(--aura-orange) 10%, transparent);
+}
