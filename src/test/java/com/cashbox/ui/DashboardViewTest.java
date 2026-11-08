@@ -14,6 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cashbox.model.Account;
+import com.cashbox.model.GoalStatus;
 import com.cashbox.model.SavingsGoal;
 import com.cashbox.repository.AccountRepository;
 import com.cashbox.repository.SavingsGoalRepository;
@@ -121,5 +122,22 @@ class DashboardViewTest extends SpringBrowserlessTest {
         assertFalse($(BookingDialog.class).all().isEmpty());
         assertTrue(amount.isInvalid());
         assertTrue(amount.getErrorMessage().startsWith("Nicht genug Geld"));
+    }
+
+    @Test
+    void pausedGoalIsNotOfferedAsTransferTarget() {
+        Account account = accounts.findFirstByOrderByIdAsc().orElseThrow();
+        SavingsGoal paused = new SavingsGoal(account, "Test-Pausiert-" + System.nanoTime(), new BigDecimal("100.00"));
+        paused.setStatus(GoalStatus.PAUSED);
+        goals.save(paused);
+        service.deposit(new BigDecimal("10"), null, null);
+
+        test($(Button.class).withId("transfer").single()).click();
+        Select<Pot> target = $(Select.class).withId("booking-target").single();
+        Pot pausedPot = target.getListDataView().getItems()
+                .filter(p -> paused.getId().equals(p.goalId())).findFirst().orElseThrow();
+
+        assertFalse(target.getItemEnabledProvider().test(pausedPot), "Pausiertes Ziel darf nicht wählbar sein");
+        assertFalse(pausedPot.equals(target.getValue()), "Pausiertes Ziel darf nicht vorbelegt sein");
     }
 }

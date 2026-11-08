@@ -3,6 +3,7 @@ package com.cashbox.model;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Comparator;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,6 +24,12 @@ import jakarta.persistence.Version;
 @Entity
 @Table(name = "savings_goal")
 public class SavingsGoal {
+
+    /** Anzeigereihenfolge: Status (aktiv zuerst), dann Priorität (leer zuletzt), dann Name. */
+    public static final Comparator<SavingsGoal> DISPLAY_ORDER = Comparator
+            .comparing(SavingsGoal::getStatus)
+            .thenComparing(SavingsGoal::getPriority, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(SavingsGoal::getName, String.CASE_INSENSITIVE_ORDER);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -71,9 +78,11 @@ public class SavingsGoal {
     public Long getId() { return id; }
     public Account getAccount() { return account; }
     public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public BigDecimal getTargetAmount() { return targetAmount; }
+    public void setTargetAmount(BigDecimal targetAmount) { this.targetAmount = targetAmount; }
     public BigDecimal getAssignedAmount() { return assignedAmount; }
     public Integer getPriority() { return priority; }
     public void setPriority(Integer priority) { this.priority = priority; }
@@ -82,6 +91,7 @@ public class SavingsGoal {
     public Instant getCreatedAt() { return createdAt; }
     public GoalStatus getStatus() { return status; }
     public void setStatus(GoalStatus status) { this.status = status; }
+    public Long getVersion() { return version; }
 
     public void assign(BigDecimal amount) {
         assignedAmount = assignedAmount.add(amount);

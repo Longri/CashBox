@@ -2,6 +2,7 @@ package com.cashbox.ui;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +13,7 @@ import com.cashbox.service.BookingService;
 import com.cashbox.service.Pot;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Key;
+import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -28,13 +30,9 @@ import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.Tabs;
 import com.vaadin.flow.component.tabs.TabsVariant;
-import com.vaadin.flow.component.textfield.Autocomplete;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.binder.Binder;
-import com.vaadin.flow.data.binder.Result;
 import com.vaadin.flow.data.binder.ValidationResult;
-import com.vaadin.flow.data.binder.ValueContext;
-import com.vaadin.flow.data.converter.Converter;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
 
@@ -44,8 +42,10 @@ import com.vaadin.flow.data.value.ValueChangeMode;
  * <li><b>Einbuchen:</b> neues Geld auf das Sparkonto – landet im Puffer oder direkt in einem Sparziel.</li>
  * <li><b>Umbuchen:</b> Geld zwischen Puffer und Sparzielen verschieben; der Kontostand bleibt gleich.</li>
  * </ul>
+ * Neues Geld bekommen nur der Puffer und aktive Sparziele; pausierte und erreichte Ziele
+ * stehen in „Nach“ ausgegraut, können aber Quelle („Von“) sein.
  * Auf schmalen Bildschirmen (Handy) wird der Dialog per CSS als Vollbild angezeigt
- * (siehe {@code styles.css}, Klasse {@code booking-dialog}).
+ * (siehe {@code styles.css}, Klasse {@code form-dialog}).
  */
 public class BookingDialog extends Dialog {
 
@@ -65,6 +65,7 @@ public class BookingDialog extends Dialog {
     private final Tab transferTab = new Tab(VaadinIcon.EXCHANGE.create(), new Span("Umbuchen"));
     private final Tabs modeTabs = new Tabs(depositTab, transferTab);
     private final Paragraph modeHint = new Paragraph();
+    private final Button goalsLink = new Button();
     private final Div errorBanner = new Div();
 
     private final TextField amount = new TextField("Betrag");
@@ -80,6 +81,7 @@ public class BookingDialog extends Dialog {
     private final Binder<Draft> binder = new Binder<>();
     private final Binder.Binding<Draft, BigDecimal> amountBinding;
     private Mode mode;
+    private boolean formEnabled;
 
     public BookingDialog(BookingService service, Mode initialMode, Runnable onBooked) {
         this.service = service;
@@ -87,9 +89,9 @@ public class BookingDialog extends Dialog {
         AccountOverview overview = service.getOverview();
         this.balance = overview.balance();
         this.pots = overview.pots();
-        this.transferPossible = pots.size() > 1 && pots.stream().anyMatch(p -> p.available().signum() > 0);
+        this.transferPossible = pots.stream().anyMatch(this::canBeSource);
 
-        addClassName("booking-dialog");
+        addClassNames("form-dialog", "booking-dialog");
         setHeaderTitle("Buchung");
         setCloseOnOutsideClick(false); // versehentliches Tippen daneben soll keine Eingaben verwerfen
         setCloseOnEsc(true);
@@ -108,10 +110,13 @@ public class BookingDialog extends Dialog {
         note.setId("booking-note");
         preview.addClassName("booking-preview");
         preview.setId("booking-preview");
-        errorBanner.addClassName("booking-error");
+        errorBanner.addClassName("form-error");
         errorBanner.getElement().setAttribute("role", "alert");
         errorBanner.setVisible(false);
-        modeHint.addClassName("booking-hint");
+        modeHint.addClassName("form-hint");
+        goalsLink.setId("booking-goals-link");
+        goalsLink.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE);
+        goalsLink.addClickListener(e -> openGoalsPage());
 
         amountBinding = bindFields();
 
@@ -131,9 +136,9 @@ public class BookingDialog extends Dialog {
 
         Button cancel = new Button("Abbrechen", e -> close());
         cancel.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        cancel.addClassName("booking-footer-button");
+        cancel.addClassName("dialog-footer-button");
         saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        saveButton.addClassName("booking-footer-button");
+        saveButton.addClassName("dialog-footer-button");
         saveButton.setId("booking-save");
         saveButton.addClickListener(e -> save());
         // Enter bzw. „Los" auf der Handytastatur bucht direkt aus den Textfeldern heraus.
@@ -162,14 +167,8 @@ public class BookingDialog extends Dialog {
 
     private void configureAmount() {
         amount.setId("booking-amount");
-        amount.addClassName("amount-field");
-        amount.setPlaceholder("0,00");
-        amount.setSuffixComponent(new Span("€"));
-        amount.setAllowedCharPattern("[\\d.,]");
-        amount.setAutocomplete(Autocomplete.OFF);
+        AmountConverter.configureField(amount);
         amount.setValueChangeMode(ValueChangeMode.EAGER);
-        // Ziffernblock mit Dezimaltrenner auf Smartphones (wird an das <input> weitergereicht)
-        amount.getElement().setProperty("inputMode", "decimal");
         amount.addValueChangeListener(e -> updateSummary());
 
         maxButton.setId("booking-max");
@@ -192,9 +191,11 @@ public class BookingDialog extends Dialog {
         source.setRenderer(potRenderer());
         source.setItemEnabledProvider(p -> p.available().signum() > 0);
         source.addValueChangeListener(e -> {
-            // Wird die bisherige Zielauswahl zur Quelle, tauschen statt doppelt wählen.
+            // Wird die bisherige Zielauswahl zur Quelle, tauschen statt doppelt wählen –
+            // es sei denn, die alte Quelle nimmt kein Geld an (pausiert/erreicht).
             if (e.getValue() != null && e.getValue().equals(target.getValue())) {
-                target.setValue(e.getOldValue());
+                Pot old = e.getOldValue();
+                target.setValue(old != null && old.acceptsMoney() ? old : firstTargetExcept(e.getValue()));
             }
             refreshTargetItems();
             if (!amount.isEmpty()) {
@@ -223,16 +224,33 @@ public class BookingDialog extends Dialog {
     }
 
     /**
-     * Sperrt in „Nach" die aktuell in „Von" gewählte Quelle. Bewusst nicht über
-     * {@code refreshAll()} des Data-Views: das setzt beim Select den Wert zurück.
+     * Sperrt in „Nach" die aktuell in „Von" gewählte Quelle sowie Ziele, die kein Geld annehmen.
+     * Bewusst nicht über {@code refreshAll()} des Data-Views: das setzt beim Select den Wert zurück.
      */
     private void refreshTargetItems() {
-        target.setItemEnabledProvider(p -> mode != Mode.TRANSFER || !p.equals(source.getValue()));
+        target.setItemEnabledProvider(p -> p.acceptsMoney() && (mode != Mode.TRANSFER || !p.equals(source.getValue())));
+    }
+
+    /** Ein Topf taugt als Quelle, wenn er Geld enthält und es einen anderen Topf gibt, der Geld annimmt. */
+    private boolean canBeSource(Pot pot) {
+        return pot.available().signum() > 0 && firstTargetExcept(pot) != null;
+    }
+
+    /** Erster Topf, der Geld annimmt und nicht {@code excluded} ist, sonst {@code null}. */
+    private Pot firstTargetExcept(Pot excluded) {
+        return pots.stream().filter(p -> p.acceptsMoney() && !p.equals(excluded)).findFirst().orElse(null);
+    }
+
+    private void openGoalsPage() {
+        getUI().ifPresent(ui -> {
+            close();
+            ui.navigate(GoalsView.class);
+        });
     }
 
     private static ComponentRenderer<Component, Pot> potRenderer() {
         return new ComponentRenderer<>(pot -> {
-            Span name = new Span(pot.name());
+            Span name = new Span(pot.acceptsMoney() ? pot.name() : pot.name() + " (" + pot.status().getLabel() + ")");
             Span available = new Span(Money.format(pot.available()));
             available.addClassName("pot-amount");
             Div row = new Div(name, available);
@@ -242,12 +260,7 @@ public class BookingDialog extends Dialog {
     }
 
     private Binder.Binding<Draft, BigDecimal> bindFields() {
-        Binder.Binding<Draft, BigDecimal> amountBind = binder.forField(amount)
-                .asRequired("Bitte einen Betrag eingeben.")
-                .withConverter(new AmountConverter())
-                .withValidator(v -> v.signum() > 0, "Der Betrag muss größer als 0 sein.")
-                .withValidator(v -> v.scale() <= 2, "Höchstens zwei Nachkommastellen – bitte ohne Tausenderpunkt eingeben.")
-                .withValidator(v -> v.compareTo(BookingService.MAX_AMOUNT) < 0, "Der Betrag ist zu groß.")
+        Binder.Binding<Draft, BigDecimal> amountBind = AmountConverter.bind(binder, amount, "Bitte einen Betrag eingeben.")
                 .withValidator((v, ctx) -> {
                     Pot from = source.getValue();
                     if (mode == Mode.TRANSFER && from != null && v.compareTo(from.available()) > 0) {
@@ -266,6 +279,10 @@ public class BookingDialog extends Dialog {
                 .asRequired("Bitte ein Ziel wählen.")
                 .withValidator(v -> mode != Mode.TRANSFER || !v.equals(source.getValue()),
                         "Von und Nach müssen sich unterscheiden.")
+                .withValidator((v, ctx) -> v.acceptsMoney()
+                        ? ValidationResult.ok()
+                        : ValidationResult.error("„" + v.name() + "“ ist "
+                                + v.status().getLabel().toLowerCase(Locale.GERMAN) + " und nimmt kein Geld an."))
                 .bind(Draft::getTarget, Draft::setTarget);
 
         binder.forField(note).bind(Draft::getNote, Draft::setNote);
@@ -286,41 +303,57 @@ public class BookingDialog extends Dialog {
         target.setLabel(transfer ? "Nach" : "Zuordnen zu");
 
         if (transfer) {
-            if (source.getValue() == null || source.getValue().available().signum() == 0) {
-                source.setValue(pots.stream().filter(p -> p.available().signum() > 0).findFirst().orElse(null));
+            if (source.getValue() == null || !canBeSource(source.getValue())) {
+                source.setValue(pots.stream().filter(this::canBeSource).findFirst().orElse(null));
             }
-            if (target.getValue() == null || target.getValue().equals(source.getValue())) {
-                target.setValue(pots.stream().filter(p -> !p.equals(source.getValue())).findFirst().orElse(null));
+            Pot to = target.getValue();
+            if (to == null || to.equals(source.getValue()) || !to.acceptsMoney()) {
+                target.setValue(firstTargetExcept(source.getValue()));
             }
-        } else if (target.getValue() == null) {
+        } else if (target.getValue() == null || !target.getValue().acceptsMoney()) {
             target.setValue(pots.getFirst()); // Puffer
         }
         refreshTargetItems();
 
-        modeHint.removeClassName("booking-hint--warning");
-        if (!transfer) {
-            modeHint.setText("Neues Geld auf dem Sparkonto. Es landet im Puffer oder direkt in einem Sparziel.");
-        } else if (pots.size() < 2) {
-            modeHint.setText("Es gibt noch keine Sparziele. Lege zuerst ein Sparziel an, um umbuchen zu können.");
-            modeHint.addClassName("booking-hint--warning");
-        } else if (!transferPossible) {
-            modeHint.setText("Es ist noch kein Geld vorhanden, das umgebucht werden könnte.");
-            modeHint.addClassName("booking-hint--warning");
-        } else {
-            modeHint.setText("Geld zwischen Puffer und Sparzielen verschieben. Der Kontostand bleibt gleich.");
-        }
-        boolean formEnabled = !transfer || transferPossible;
+        updateModeHint(transfer);
+        formEnabled = !transfer || transferPossible;
         amount.setEnabled(formEnabled);
         source.setEnabled(formEnabled);
         target.setEnabled(formEnabled);
         note.setEnabled(formEnabled);
-        swapButton.setEnabled(formEnabled);
         saveButton.setEnabled(formEnabled);
 
         if (!amount.isEmpty()) {
             amountBinding.validate();
         }
         updateSummary();
+    }
+
+    /** Erklärt den Modus bzw. warum Umbuchen gerade nicht geht – mit Weg zur Sparziel-Seite. */
+    private void updateModeHint(boolean transfer) {
+        boolean hasGoals = pots.size() > 1;
+        boolean hasMoney = pots.stream().anyMatch(p -> p.available().signum() > 0);
+        String text;
+        String linkText = null;
+        if (!transfer) {
+            text = "Neues Geld auf dem Sparkonto. Es landet im Puffer oder direkt in einem aktiven Sparziel.";
+        } else if (!hasGoals) {
+            text = "Es gibt noch keine Sparziele. Lege zuerst ein Sparziel an, um umbuchen zu können.";
+            linkText = "Sparziel anlegen";
+        } else if (!hasMoney) {
+            text = "Es ist noch kein Geld vorhanden, das umgebucht werden könnte.";
+        } else if (!transferPossible) {
+            text = "Es gibt kein aktives Sparziel, auf das umgebucht werden könnte.";
+            linkText = "Sparziele verwalten";
+        } else {
+            text = "Geld zwischen Puffer und Sparzielen verschieben. Der Kontostand bleibt gleich.";
+        }
+        modeHint.setText(text);
+        if (linkText != null) {
+            goalsLink.setText(linkText);
+            modeHint.add(new Text(" "), goalsLink);
+        }
+        modeHint.setClassName("form-hint--warning", transfer && !transferPossible);
     }
 
     /** Aktualisiert Hilfetext, Vorschau und Beschriftung des Buchen-Buttons. */
@@ -336,6 +369,8 @@ public class BookingDialog extends Dialog {
             amount.setHelperText(null);
         }
         maxButton.setEnabled(mode == Mode.TRANSFER && from != null && from.available().signum() > 0);
+        // Tauschen würde ein pausiertes/erreichtes Ziel zum Ziel machen – dann gesperrt.
+        swapButton.setEnabled(formEnabled && (from == null || from.acceptsMoney()));
 
         String verb = mode == Mode.TRANSFER ? "umbuchen" : "einbuchen";
         saveButton.setText(valid ? Money.format(value) + " " + verb : capitalize(verb));
@@ -424,22 +459,6 @@ public class BookingDialog extends Dialog {
     }
 
     // ------------------------------------------------------------------ Hilfsklassen
-
-    /** Text ↔ Betrag; akzeptiert Komma und Punkt als Dezimaltrenner. */
-    private static final class AmountConverter implements Converter<String, BigDecimal> {
-        @Override
-        public Result<BigDecimal> convertToModel(String value, ValueContext context) {
-            BigDecimal parsed = Money.parse(value);
-            return parsed == null
-                    ? Result.error("Bitte einen gültigen Betrag eingeben, z. B. 12,50.")
-                    : Result.ok(parsed);
-        }
-
-        @Override
-        public String convertToPresentation(BigDecimal value, ValueContext context) {
-            return value == null ? "" : Money.formatPlain(value);
-        }
-    }
 
     /** Formularzustand für den Binder. */
     private static final class Draft {

@@ -18,7 +18,7 @@ public record AccountOverview(String accountName, BigDecimal balance, BigDecimal
     public List<Pot> pots() {
         List<Pot> pots = new ArrayList<>(goals.size() + 1);
         pots.add(Pot.buffer(buffer));
-        goals.forEach(g -> pots.add(new Pot(g.id(), g.name(), g.assigned())));
+        goals.forEach(g -> pots.add(new Pot(g.id(), g.name(), g.assigned(), g.status())));
         return pots;
     }
 }

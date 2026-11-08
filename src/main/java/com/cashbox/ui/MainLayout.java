@@ -28,6 +28,7 @@ public class MainLayout extends AppLayout {
 
         SideNav nav = new SideNav();
         nav.addItem(new SideNavItem("Übersicht", DashboardView.class, VaadinIcon.DASHBOARD.create()));
+        nav.addItem(new SideNavItem("Sparziele", GoalsView.class, VaadinIcon.PIGGY_BANK.create()));
         if (auth.hasRole("ADMIN")) {
             nav.addItem(new SideNavItem("Benutzer", UsersView.class, VaadinIcon.USERS.create()));
         }

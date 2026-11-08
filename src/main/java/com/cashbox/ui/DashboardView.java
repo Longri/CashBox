@@ -7,6 +7,7 @@ import com.cashbox.service.AccountOverview;
 import com.cashbox.service.BookingService;
 import com.cashbox.service.Pot;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.Div;
@@ -19,6 +20,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.router.RouterLink;
 
 import jakarta.annotation.security.PermitAll;
 
@@ -57,7 +59,12 @@ public class DashboardView extends VerticalLayout {
         goalList.addClassName("goal-list");
         accountName.addClassName("dashboard-title");
 
-        add(accountName, summary, actions, new H3("Sparziele"), goalList);
+        RouterLink manage = new RouterLink("Verwalten", GoalsView.class);
+        manage.setId("goals-manage");
+        Div goalsHeader = new Div(new H3("Sparziele"), manage);
+        goalsHeader.addClassName("section-header");
+
+        add(accountName, summary, actions, goalsHeader, goalList);
         refresh();
     }
 
@@ -82,7 +89,9 @@ public class DashboardView extends VerticalLayout {
 
         goalList.removeAll();
         if (overview.goals().isEmpty()) {
-            Paragraph empty = new Paragraph("Noch keine Sparziele angelegt.");
+            RouterLink create = new RouterLink("Sparziel anlegen", GoalsView.class);
+            create.setId("goals-create-link");
+            Paragraph empty = new Paragraph(new Text("Noch keine Sparziele angelegt. "), create);
             empty.addClassName("goal-list__empty");
             goalList.add(empty);
             return;
@@ -90,21 +99,35 @@ public class DashboardView extends VerticalLayout {
         overview.goals().forEach(goal -> goalList.add(goalRow(goal)));
     }
 
+    /** Eine Zielzeile; ein Tipp darauf führt zur Sparziel-Verwaltung. */
     private static Component goalRow(AccountOverview.GoalInfo goal) {
         Span name = new Span(goal.name());
         name.addClassName("goal-row__name");
+        Div title = new Div(name);
+        title.addClassName("goal-row__title");
+        if (!goal.status().acceptsMoney()) {
+            Span badge = new Span(goal.status().getLabel());
+            badge.addClassName("goal-status-badge");
+            title.add(badge);
+        }
         Span amounts = new Span(Money.format(goal.assigned()) + " von " + Money.format(goal.target()));
         amounts.addClassName("goal-row__amounts");
-        Div head = new Div(name, amounts);
+        Div head = new Div(title, amounts);
         head.addClassName("goal-row__head");
 
-        double progress = goal.target().signum() > 0
-                ? goal.assigned().divide(goal.target(), 4, RoundingMode.HALF_UP).min(BigDecimal.ONE).doubleValue()
-                : 0;
-        ProgressBar bar = new ProgressBar(0, 1, progress);
+        ProgressBar bar = new ProgressBar(0, 1, progress(goal.assigned(), goal.target()));
 
-        Div row = new Div(head, bar);
-        row.addClassName("goal-row");
+        RouterLink row = new RouterLink(GoalsView.class);
+        row.add(head, bar);
+        row.addClassNames("goal-row", "goal-row--link");
+        row.setClassName("goal-row--inactive", !goal.status().acceptsMoney());
         return row;
+    }
+
+    /** Fortschritt für die {@link ProgressBar}: 0 bis 1, bei Überfüllung gedeckelt. */
+    static double progress(BigDecimal assigned, BigDecimal target) {
+        return target.signum() > 0
+                ? assigned.divide(target, 4, RoundingMode.HALF_UP).min(BigDecimal.ONE).doubleValue()
+                : 0;
     }
 }

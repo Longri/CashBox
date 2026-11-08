@@ -3,8 +3,8 @@ package com.cashbox.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.cashbox.model.Account;
 import com.cashbox.model.Booking;
 import com.cashbox.model.BookingType;
+import com.cashbox.model.GoalStatus;
 import com.cashbox.model.SavingsGoal;
 import com.cashbox.repository.AccountRepository;
 import com.cashbox.repository.BookingRepository;
@@ -29,10 +30,6 @@ public class BookingService {
     public static final BigDecimal MAX_AMOUNT = new BigDecimal("1000000000");
     public static final int MAX_NOTE_LENGTH = 255;
 
-    private static final Comparator<SavingsGoal> DISPLAY_ORDER = Comparator
-            .comparing(SavingsGoal::getPriority, Comparator.nullsLast(Comparator.naturalOrder()))
-            .thenComparing(SavingsGoal::getName, String.CASE_INSENSITIVE_ORDER);
-
     private final AccountRepository accounts;
     private final SavingsGoalRepository goals;
     private final BookingRepository bookings;
@@ -47,7 +44,7 @@ public class BookingService {
     public AccountOverview getOverview() {
         Account account = loadAccount();
         List<AccountOverview.GoalInfo> goalInfos = goals.findByAccountId(account.getId()).stream()
-                .sorted(DISPLAY_ORDER)
+                .sorted(SavingsGoal.DISPLAY_ORDER)
                 .map(g -> new AccountOverview.GoalInfo(g.getId(), g.getName(), g.getAssignedAmount(),
                         g.getTargetAmount(), g.getStatus()))
                 .toList();
@@ -66,13 +63,14 @@ public class BookingService {
         BigDecimal value = normalizeAmount(amount);
         String text = normalizeNote(note);
         Account account = loadAccount();
+        // Ziel zuerst prüfen, damit bei einem ungültigen Ziel nichts verändert wird.
+        SavingsGoal target = targetGoalId == null ? null : loadTargetGoal(account, targetGoalId);
         Instant now = Instant.now();
 
         account.deposit(value);
         bookings.save(new Booking(account, BookingType.DEPOSIT, value, null, null, text, now));
 
-        if (targetGoalId != null) {
-            SavingsGoal target = loadGoal(account, targetGoalId);
+        if (target != null) {
             account.takeFromBuffer(value);
             target.assign(value);
             bookings.save(new Booking(account, BookingType.TRANSFER, value, null, target, text, now));
@@ -82,6 +80,8 @@ public class BookingService {
 
     /**
      * Geld zwischen Puffer und Sparzielen verschieben ({@code null} = Puffer).
+     * Ziel muss der Puffer oder ein aktives Sparziel sein; als Quelle ist jedes Ziel erlaubt,
+     * damit Restgeld aus pausierten oder erreichten Zielen zurückgebucht werden kann.
      */
     @Transactional
     public void transfer(Long sourceGoalId, Long targetGoalId, BigDecimal amount, String note) {
@@ -93,7 +93,7 @@ public class BookingService {
         Account account = loadAccount();
 
         SavingsGoal source = sourceGoalId == null ? null : loadGoal(account, sourceGoalId);
-        SavingsGoal target = targetGoalId == null ? null : loadGoal(account, targetGoalId);
+        SavingsGoal target = targetGoalId == null ? null : loadTargetGoal(account, targetGoalId);
 
         if (source == null) {
             account.takeFromBuffer(value);
@@ -123,15 +123,32 @@ public class BookingService {
         return goal;
     }
 
+    /** Wie {@link #loadGoal}, aber nur aktive Ziele dürfen neues Geld bekommen. */
+    private SavingsGoal loadTargetGoal(Account account, Long goalId) {
+        SavingsGoal goal = loadGoal(account, goalId);
+        if (!goal.getStatus().acceptsMoney()) {
+            throw new IllegalArgumentException("Das Sparziel „" + goal.getName() + "“ ist "
+                    + goal.getStatus().getLabel().toLowerCase(Locale.GERMAN)
+                    + " und nimmt kein Geld an. Setze es zuerst wieder auf „"
+                    + GoalStatus.ACTIVE.getLabel() + "“.");
+        }
+        return goal;
+    }
+
     static BigDecimal normalizeAmount(BigDecimal amount) {
+        return normalizeAmount(amount, "Der Betrag");
+    }
+
+    /** @param subject Subjekt der Fehlermeldung, z. B. „Der Zielbetrag“ */
+    static BigDecimal normalizeAmount(BigDecimal amount, String subject) {
         if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("Der Betrag muss größer als 0 sein.");
+            throw new IllegalArgumentException(subject + " muss größer als 0 sein.");
         }
         if (amount.stripTrailingZeros().scale() > 2) {
-            throw new IllegalArgumentException("Der Betrag darf höchstens zwei Nachkommastellen haben.");
+            throw new IllegalArgumentException(subject + " darf höchstens zwei Nachkommastellen haben.");
         }
         if (amount.compareTo(MAX_AMOUNT) >= 0) {
-            throw new IllegalArgumentException("Der Betrag ist zu groß.");
+            throw new IllegalArgumentException(subject + " ist zu groß.");
         }
         return amount.setScale(2, RoundingMode.UNNECESSARY);
     }

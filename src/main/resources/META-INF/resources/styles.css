@@ -73,36 +73,153 @@
   font-weight: 600;
 }
 
+.goal-row__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lumo-space-xs) var(--lumo-space-s);
+}
+
 .goal-row__amounts {
   color: var(--lumo-secondary-text-color);
   font-size: var(--lumo-font-size-s);
   font-variant-numeric: tabular-nums;
 }
 
-/* ------------------------------------------------------------------ Buchungsdialog */
+/* Zielzeile im Dashboard als Link zur Sparziel-Seite */
+.goal-row--link {
+  display: block;
+  margin: calc(var(--lumo-space-xs) * -1) calc(var(--lumo-space-s) * -1);
+  padding: var(--lumo-space-xs) var(--lumo-space-s);
+  border-radius: var(--lumo-border-radius-m);
+  color: inherit;
+  text-decoration: none;
+}
 
-vaadin-dialog.booking-dialog::part(overlay) {
+.goal-row--link:hover {
+  background: var(--lumo-contrast-5pct);
+}
+
+.goal-row--inactive {
+  opacity: 0.6;
+}
+
+.goal-status-badge {
+  padding: 0 var(--lumo-space-xs);
+  border-radius: var(--lumo-border-radius-s);
+  background: var(--lumo-contrast-10pct);
+  color: var(--lumo-secondary-text-color);
+  font-size: var(--lumo-font-size-xs);
+  font-weight: 500;
+}
+
+.section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--lumo-space-s);
+  width: 100%;
+}
+
+.section-header h3 {
+  margin: var(--lumo-space-m) 0 0;
+}
+
+/* ------------------------------------------------------------------ Sparziel-Seite */
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lumo-space-s) var(--lumo-space-m);
+  width: 100%;
+}
+
+.page-title {
+  margin: 0;
+  font-size: var(--lumo-font-size-xl);
+}
+
+/* Antippbare Karte: natives <button>, Browser-Styles zurücksetzen */
+.goal-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lumo-space-xs);
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--lumo-space-m);
+  border: none;
+  border-radius: var(--lumo-border-radius-l);
+  background: var(--lumo-contrast-5pct);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.goal-card:hover {
+  background: var(--lumo-contrast-10pct);
+}
+
+.goal-card:focus-visible {
+  outline: 2px solid var(--lumo-primary-color);
+  outline-offset: 2px;
+}
+
+.goal-card__meta {
+  color: var(--lumo-secondary-text-color);
+  font-size: var(--lumo-font-size-s);
+}
+
+.goal-card__description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  color: var(--lumo-secondary-text-color);
+  font-size: var(--lumo-font-size-s);
+  white-space: pre-line;
+}
+
+/* ------------------------------------------------------------------ Dialoge (Buchung, Sparziel) */
+
+vaadin-dialog.form-dialog::part(overlay) {
   width: min(30rem, 100%);
 }
 
-.booking-form {
+.booking-form,
+.goal-form {
   gap: var(--lumo-space-s);
 }
 
-.booking-hint {
+.form-hint {
   margin: 0;
   color: var(--lumo-secondary-text-color);
   font-size: var(--lumo-font-size-s);
 }
 
-.booking-hint--warning {
+.form-hint--warning {
   padding: var(--lumo-space-s) var(--lumo-space-m);
   border-radius: var(--lumo-border-radius-m);
   background: var(--lumo-warning-color-10pct);
   color: var(--lumo-warning-text-color);
 }
 
-.booking-error {
+.form-hint--success {
+  padding: var(--lumo-space-s) var(--lumo-space-m);
+  border-radius: var(--lumo-border-radius-m);
+  background: var(--lumo-success-color-10pct);
+  color: var(--lumo-success-text-color);
+}
+
+.dialog-footer-delete {
+  margin-inline-end: auto;
+}
+
+.form-error {
   padding: var(--lumo-space-s) var(--lumo-space-m);
   border-radius: var(--lumo-border-radius-m);
   background: var(--lumo-error-color-10pct);
@@ -174,7 +291,7 @@ vaadin-dialog.booking-dialog::part(overlay) {
 
 /* Handy: Dialog als Vollbild, Buttons unten in Daumenreichweite und gleich breit */
 @media (max-width: 600px) {
-  vaadin-dialog.booking-dialog::part(overlay) {
+  vaadin-dialog.form-dialog::part(overlay) {
     position: fixed;
     inset: 0;
     width: 100%;
@@ -185,19 +302,19 @@ vaadin-dialog.booking-dialog::part(overlay) {
     border-radius: 0;
   }
 
-  vaadin-dialog.booking-dialog::part(header) {
+  vaadin-dialog.form-dialog::part(header) {
     padding-top: max(var(--lumo-space-m), env(safe-area-inset-top));
   }
 
-  vaadin-dialog.booking-dialog::part(content) {
+  vaadin-dialog.form-dialog::part(content) {
     flex: 1;
   }
 
-  vaadin-dialog.booking-dialog::part(footer) {
+  vaadin-dialog.form-dialog::part(footer) {
     padding-bottom: max(var(--lumo-space-m), env(safe-area-inset-bottom));
   }
 
-  .booking-footer-button {
+  .dialog-footer-button {
     flex: 1;
   }
 }
