@@ -20,6 +20,7 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 DROP TABLE IF EXISTS booking;
+DROP TABLE IF EXISTS savings_goal_image;
 DROP TABLE IF EXISTS savings_goal;
 DROP TABLE IF EXISTS account;
 
@@ -66,6 +67,10 @@ CREATE TABLE savings_goal (
     -- Längeres Notizfeld: Details, Links, Gedanken zum Ziel
     description      TEXT            NULL,
 
+    -- Optionales Standardsymbol (Name aus GoalIcon); NULL = Sparschwein.
+    -- Ein eigenes Bild steht in savings_goal_image und hat Vorrang.
+    icon             VARCHAR(40)     NULL,
+
     target_amount    DECIMAL(19,2)   NOT NULL,
     assigned_amount  DECIMAL(19,2)   NOT NULL DEFAULT 0.00,
 
@@ -104,6 +109,42 @@ CREATE INDEX idx_goal_priority        ON savings_goal (account_id, priority);
 
 -- Namen pro Konto eindeutig halten - verhindert zwei Töpfe "Motorrad"
 CREATE UNIQUE INDEX uq_goal_name_per_account ON savings_goal (account_id, name);
+
+-- ---------------------------------------------------------------------
+--  savings_goal_image - optionales eigenes Bild eines Sparziels: angezeigter
+--  Ausschnitt plus Quellbild, damit sich der Ausschnitt später ohne neuen
+--  Upload ändern lässt. Eigene Tabelle, damit Listen die Bilddaten nicht
+--  mitladen. Wird mit dem Sparziel gelöscht.
+-- ---------------------------------------------------------------------
+CREATE TABLE savings_goal_image (
+    goal_id              BIGINT        NOT NULL,
+
+    -- Angezeigtes Bild: der gewählte Ausschnitt, quadratisch, max. 256 px
+    content_type         VARCHAR(50)   NOT NULL,
+    data                 MEDIUMBLOB    NOT NULL,
+
+    -- Hochgeladenes Bild (richtig gedreht, auf max. 1600 px verkleinert).
+    -- Daraus wird der Ausschnitt neu berechnet, wenn man ihn später ändert.
+    source_content_type  VARCHAR(50)   NOT NULL,
+    source_data          MEDIUMBLOB    NOT NULL,
+
+    -- Ausschnitt relativ zum Quellbild: Mittelpunkt (0..1 der Breite bzw. Höhe)
+    -- und Kantenlänge als Anteil der kürzeren Bildseite: 1 = Bild füllt den
+    -- Ausschnitt, < 1 hineingezoomt, > 1 herausgezoomt (Rand bleibt durchsichtig)
+    crop_x               DOUBLE        NOT NULL,
+    crop_y               DOUBLE        NOT NULL,
+    crop_size            DOUBLE        NOT NULL,
+
+    PRIMARY KEY (goal_id),
+    CONSTRAINT fk_goal_image_goal
+        FOREIGN KEY (goal_id) REFERENCES savings_goal (id)
+        ON DELETE CASCADE
+        ON UPDATE RESTRICT,
+    CONSTRAINT chk_goal_image_crop CHECK (
+        crop_x BETWEEN 0 AND 1 AND crop_y BETWEEN 0 AND 1 AND crop_size > 0 AND crop_size <= 16)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
 --  booking - unveränderliche Historie aller Ein-, Um- und Auszahlungen

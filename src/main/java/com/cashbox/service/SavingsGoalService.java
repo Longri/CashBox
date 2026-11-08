@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -13,8 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.cashbox.model.Account;
 import com.cashbox.model.GoalStatus;
 import com.cashbox.model.SavingsGoal;
+import com.cashbox.model.SavingsGoalImage;
 import com.cashbox.repository.AccountRepository;
 import com.cashbox.repository.BookingRepository;
+import com.cashbox.repository.SavingsGoalImageRepository;
 import com.cashbox.repository.SavingsGoalRepository;
 
 /**
@@ -25,6 +29,10 @@ import com.cashbox.repository.SavingsGoalRepository;
  * Löschen ist nur für leere Ziele ohne Buchungen erlaubt (die Fremdschlüssel in
  * {@code booking} sind {@code ON DELETE RESTRICT}); alle anderen Ziele werden
  * pausiert oder als erreicht markiert.
+ * <p>
+ * Jedes Ziel zeigt ein Standardsymbol ({@link com.cashbox.model.GoalIcon}) oder ein eigenes Bild
+ * ({@link GoalImage}, ein Ausschnitt aus dem hochgeladenen {@link GoalPhoto}); was sich ändern soll,
+ * steht in {@link GoalInput#icon()}.
  */
 @Service
 public class SavingsGoalService {
@@ -38,21 +46,40 @@ public class SavingsGoalService {
     private final AccountRepository accounts;
     private final SavingsGoalRepository goals;
     private final BookingRepository bookings;
+    private final SavingsGoalImageRepository images;
 
-    public SavingsGoalService(AccountRepository accounts, SavingsGoalRepository goals, BookingRepository bookings) {
+    public SavingsGoalService(AccountRepository accounts, SavingsGoalRepository goals, BookingRepository bookings,
+                              SavingsGoalImageRepository images) {
         this.accounts = accounts;
         this.goals = goals;
         this.bookings = bookings;
+        this.images = images;
     }
 
     /** Alle Sparziele des Kontos in Anzeigereihenfolge (aktiv zuerst, dann Priorität, dann Name). */
     @Transactional(readOnly = true)
     public List<GoalDetails> findAll() {
         Account account = loadAccount();
+        Set<Long> withImage = images.findGoalIdsWithImage(account.getId());
         return goals.findByAccountId(account.getId()).stream()
                 .sorted(SavingsGoal.DISPLAY_ORDER)
-                .map(GoalDetails::of)
+                .map(goal -> GoalDetails.of(goal, withImage.contains(goal.getId())))
                 .toList();
+    }
+
+    /** Das angezeigte Bild (Ausschnitt) eines Sparziels, falls es eines hat. */
+    @Transactional(readOnly = true)
+    public Optional<GoalImage> findImage(Long goalId) {
+        return images.findThumbnail(Objects.requireNonNull(goalId, "goalId"))
+                .map(image -> new GoalImage(image.getData(), image.getContentType()));
+    }
+
+    /** Quellbild und Ausschnitt eines Sparziels – zum nachträglichen Ändern des Ausschnitts. */
+    @Transactional(readOnly = true)
+    public Optional<StoredPhoto> findPhoto(Long goalId) {
+        return images.findById(Objects.requireNonNull(goalId, "goalId"))
+                .map(image -> new StoredPhoto(new GoalPhoto(image.getSourceData(), image.getSourceContentType()),
+                        new ImageCrop(image.getCropX(), image.getCropY(), image.getCropSize())));
     }
 
     /** Legt ein neues, aktives und leeres Sparziel an. */
@@ -66,11 +93,13 @@ public class SavingsGoalService {
         }
         SavingsGoal goal = new SavingsGoal(account, name, normalizeTarget(input.targetAmount()));
         applyOptionalFields(goal, input);
-        return GoalDetails.of(saveAndFlush(goal));
+        applySymbol(goal, input.icon());
+        SavingsGoal saved = saveAndFlush(goal);
+        return GoalDetails.of(saved, applyImage(saved.getId(), input.icon()));
     }
 
     /**
-     * Ändert Stammdaten und Status eines Sparziels. Der zugewiesene Betrag bleibt unverändert.
+     * Ändert Stammdaten, Symbol bzw. Bild und Status eines Sparziels. Der zugewiesene Betrag bleibt unverändert.
      *
      * @param version die Version, mit der das Formular geöffnet wurde
      * @throws org.springframework.dao.OptimisticLockingFailureException wenn das Ziel inzwischen geändert wurde
@@ -88,8 +117,10 @@ public class SavingsGoalService {
         goal.setName(name);
         goal.setTargetAmount(normalizeTarget(input.targetAmount()));
         applyOptionalFields(goal, input);
+        applySymbol(goal, input.icon());
         goal.setStatus(status);
-        return GoalDetails.of(saveAndFlush(goal));
+        SavingsGoal saved = saveAndFlush(goal);
+        return GoalDetails.of(saved, applyImage(saved.getId(), input.icon()));
     }
 
     /**
@@ -137,6 +168,9 @@ public class SavingsGoalService {
         if (blocker != null) {
             throw new IllegalStateException(blocker);
         }
+        // Die Datenbank löscht das Bild ohnehin mit (ON DELETE CASCADE); hier zusätzlich, damit auch
+        // der Persistenzkontext dieser Transaktion es nicht mehr kennt.
+        images.deleteById(goal.getId());
         goals.delete(goal);
     }
 
@@ -180,6 +214,47 @@ public class SavingsGoalService {
             throw new ObjectOptimisticLockingFailureException(SavingsGoal.class, id);
         }
         return goal;
+    }
+
+    /** Setzt das Symbol (auch {@code null} = Standard). Ein eigenes Bild verdrängt das Symbol nicht. */
+    private static void applySymbol(SavingsGoal goal, GoalIconChoice choice) {
+        if (choice instanceof GoalIconChoice.Symbol symbol) {
+            goal.setIcon(symbol.icon());
+        }
+    }
+
+    /**
+     * Legt das eigene Bild an, ersetzt oder entfernt es bzw. ändert seinen Ausschnitt.
+     *
+     * @return ob das Ziel danach ein eigenes Bild hat
+     */
+    private boolean applyImage(Long goalId, GoalIconChoice choice) {
+        return switch (choice) {
+            case GoalIconChoice.Unchanged unchanged -> images.existsById(goalId);
+            case GoalIconChoice.Symbol symbol -> {
+                images.deleteById(goalId);
+                yield false;
+            }
+            case GoalIconChoice.Image image -> {
+                SavingsGoalImage stored = images.findById(goalId).orElseGet(() -> new SavingsGoalImage(goalId));
+                stored.setSource(image.photo().contentType(), image.photo().rawData());
+                setCrop(stored, image.photo(), image.crop());
+                images.saveAndFlush(stored);
+                yield true;
+            }
+            case GoalIconChoice.Crop crop -> {
+                SavingsGoalImage stored = images.findById(goalId).orElseThrow(() -> new IllegalStateException(
+                        "Das Sparziel hat kein eigenes Bild mehr. Bitte das Bild neu hochladen."));
+                setCrop(stored, new GoalPhoto(stored.getSourceData(), stored.getSourceContentType()), crop.crop());
+                images.flush();
+                yield true;
+            }
+        };
+    }
+
+    private static void setCrop(SavingsGoalImage stored, GoalPhoto photo, ImageCrop crop) {
+        GoalImage image = GoalImage.render(photo, crop);
+        stored.setCrop(crop.centerX(), crop.centerY(), crop.size(), image.contentType(), image.rawData());
     }
 
     private static void applyOptionalFields(SavingsGoal goal, GoalInput input) {

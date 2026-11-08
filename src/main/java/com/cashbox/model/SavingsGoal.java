@@ -45,6 +45,10 @@ public class SavingsGoal {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    /** Name eines {@link GoalIcon}; {@code null} = Standardsymbol. Ein eigenes Bild steht in {@link SavingsGoalImage}. */
+    @Column(length = GoalIcon.MAX_KEY_LENGTH)
+    private String icon;
+
     @Column(name = "target_amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal targetAmount;
 
@@ -81,6 +85,9 @@ public class SavingsGoal {
     public void setName(String name) { this.name = name; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    /** Das gewählte Standardsymbol oder {@code null} (Standard bzw. unbekannter Name). */
+    public GoalIcon getIcon() { return GoalIcon.fromKey(icon).orElse(null); }
+    public void setIcon(GoalIcon icon) { this.icon = icon == null ? null : icon.name(); }
     public BigDecimal getTargetAmount() { return targetAmount; }
     public void setTargetAmount(BigDecimal targetAmount) { this.targetAmount = targetAmount; }
     public BigDecimal getAssignedAmount() { return assignedAmount; }

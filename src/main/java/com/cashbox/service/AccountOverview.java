@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cashbox.model.GoalIcon;
 import com.cashbox.model.GoalStatus;
 
 /**
@@ -11,7 +12,12 @@ import com.cashbox.model.GoalStatus;
  */
 public record AccountOverview(String accountName, BigDecimal balance, BigDecimal buffer, List<GoalInfo> goals) {
 
-    public record GoalInfo(Long id, String name, BigDecimal assigned, BigDecimal target, GoalStatus status) {
+    /**
+     * @param icon     gewähltes Standardsymbol oder {@code null} für {@link GoalIcon#DEFAULT}
+     * @param hasImage {@code true}, wenn ein eigenes Bild hinterlegt ist
+     */
+    public record GoalInfo(Long id, String name, BigDecimal assigned, BigDecimal target, GoalStatus status,
+                           GoalIcon icon, boolean hasImage) {
     }
 
     /** Puffer zuerst, danach die Sparziele in Anzeigereihenfolge. */

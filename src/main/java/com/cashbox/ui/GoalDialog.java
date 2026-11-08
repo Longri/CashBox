@@ -9,9 +9,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.OptimisticLockingFailureException;
 
+import com.cashbox.model.GoalIcon;
 import com.cashbox.model.GoalStatus;
 import com.cashbox.service.GoalDetails;
+import com.cashbox.service.GoalIconChoice;
+import com.cashbox.service.GoalImage;
 import com.cashbox.service.GoalInput;
+import com.cashbox.service.GoalPhoto;
+import com.cashbox.service.ImageCrop;
 import com.cashbox.service.SavingsGoalService;
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.button.Button;
@@ -20,7 +25,9 @@ import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.NativeButton;
 import com.vaadin.flow.component.html.Paragraph;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
@@ -35,6 +42,9 @@ import com.vaadin.flow.data.binder.Binder;
  * Dialog zum Anlegen und Bearbeiten eines Sparziels.
  * <ul>
  * <li><b>Neu:</b> Name, Zielbetrag und optionale Angaben; das Ziel startet aktiv und leer.</li>
+ * <li><b>Symbol:</b> ein Tipp auf das runde Symbol links neben dem Namen öffnet den {@link GoalIconDialog}
+ *     (Standardsymbol oder eigenes Bild). Nach dem Hochladen und über „Ausschnitt ändern“ folgt der
+ *     {@link GoalImageCropDialog}. Gespeichert wird erst mit dem Ziel.</li>
  * <li><b>Bearbeiten:</b> zusätzlich Status und – nur für leere Ziele ohne Buchungen – Löschen.</li>
  * </ul>
  * Geld wird hier nie bewegt; dafür gibt es Ein- und Umbuchen in der Übersicht.
@@ -57,6 +67,14 @@ public class GoalDialog extends Dialog {
     private final TextArea description = new TextArea("Beschreibung (optional)");
     private final RadioButtonGroup<GoalStatus> status = new RadioButtonGroup<>("Status");
     private final Button saveButton = new Button();
+    private final GoalAvatar iconPreview = new GoalAvatar(GoalAvatar.Size.LARGE);
+    private final NativeButton iconButton = new NativeButton();
+    /** Was beim Speichern mit Symbol und Bild passiert; bis zur ersten Auswahl bleibt alles, wie es ist. */
+    private GoalIconChoice iconChoice = GoalIconChoice.UNCHANGED;
+    /** Das gerade gezeigte Symbol, {@code null} bei eigenem Bild – für die Markierung im Auswahldialog. */
+    private GoalIcon shownIcon;
+    /** Vorschau eines neu gewählten Bilds bzw. Ausschnitts (noch nicht gespeichert), sonst {@code null}. */
+    private GoalImage pendingImage;
 
     private final Binder<Draft> binder = new Binder<>();
 
@@ -86,7 +104,11 @@ public class GoalDialog extends Dialog {
         errorBanner.getElement().setAttribute("role", "alert");
         errorBanner.setVisible(false);
 
-        VerticalLayout content = new VerticalLayout(errorBanner, name, target, targetDate, priority, description);
+        configureIcon();
+        Div identity = new Div(iconButton, name);
+        identity.addClassName("goal-identity");
+
+        VerticalLayout content = new VerticalLayout(errorBanner, identity, target, targetDate, priority, description);
         content.setPadding(false);
         content.setSpacing(false);
         content.addClassName("goal-form");
@@ -123,6 +145,24 @@ public class GoalDialog extends Dialog {
     }
 
     // ------------------------------------------------------------------ Aufbau
+
+    private void configureIcon() {
+        if (isNew()) {
+            iconPreview.showIcon(null);
+            shownIcon = GoalIcon.DEFAULT;
+        } else {
+            iconPreview.showStored(existing.id(), existing.icon(), existing.hasImage(), service);
+            shownIcon = existing.hasImage() ? null : orDefault(existing.icon());
+        }
+        Span badge = new Span(VaadinIcon.PENCIL.create());
+        badge.addClassName("goal-icon-button__badge");
+        iconButton.add(iconPreview, badge);
+        iconButton.setId("goal-icon");
+        iconButton.addClassName("goal-icon-button");
+        iconButton.setAriaLabel("Symbol oder Bild ändern");
+        iconButton.getElement().setAttribute("title", "Symbol oder Bild ändern");
+        iconButton.addClickListener(e -> openIconDialog());
+    }
 
     private void configureFields() {
         name.setId("goal-name");
@@ -223,6 +263,67 @@ public class GoalDialog extends Dialog {
 
     // ------------------------------------------------------------------ Verhalten
 
+    private void openIconDialog() {
+        GoalAvatar currentImage = null;
+        if (shownIcon == null) {
+            currentImage = new GoalAvatar(GoalAvatar.Size.MEDIUM);
+            if (pendingImage != null) {
+                currentImage.showImage(pendingImage);
+            } else {
+                currentImage.showStored(existing.id(), null, true, service);
+            }
+        }
+        new GoalIconDialog(shownIcon, currentImage, this::symbolChosen, this::photoUploaded, this::editCrop).open();
+    }
+
+    private void symbolChosen(GoalIcon icon) {
+        iconChoice = new GoalIconChoice.Symbol(icon);
+        pendingImage = null;
+        shownIcon = orDefault(icon);
+        iconPreview.showIcon(icon);
+        iconButton.focus();
+    }
+
+    /** Neues Bild: erst den Ausschnitt wählen lassen; Abbrechen verwirft den Upload. */
+    private void photoUploaded(GoalPhoto photo) {
+        new GoalImageCropDialog(photo, ImageCrop.FULL,
+                crop -> imageChosen(new GoalIconChoice.Image(photo, crop), photo, crop)).open();
+    }
+
+    /** Ausschnitt des aktuellen Bilds ändern – des neu hochgeladenen oder des gespeicherten. */
+    private void editCrop() {
+        hideError();
+        if (iconChoice instanceof GoalIconChoice.Image image) {
+            new GoalImageCropDialog(image.photo(), image.crop(),
+                    crop -> imageChosen(new GoalIconChoice.Image(image.photo(), crop), image.photo(), crop)).open();
+            return;
+        }
+        service.findPhoto(existing.id()).ifPresentOrElse(stored -> {
+            ImageCrop current = iconChoice instanceof GoalIconChoice.Crop pending ? pending.crop() : stored.crop();
+            new GoalImageCropDialog(stored.photo(), current,
+                    crop -> imageChosen(new GoalIconChoice.Crop(crop), stored.photo(), crop)).open();
+        }, () -> showError("Das Bild ist nicht mehr vorhanden. Bitte lade es neu hoch."));
+    }
+
+    private void imageChosen(GoalIconChoice choice, GoalPhoto photo, ImageCrop crop) {
+        GoalImage preview;
+        try {
+            preview = GoalImage.render(photo, crop);
+        } catch (RuntimeException ex) {
+            handleError(ex, "Bildausschnitt konnte nicht berechnet werden");
+            return;
+        }
+        iconChoice = choice;
+        pendingImage = preview;
+        shownIcon = null;
+        iconPreview.showImage(preview);
+        iconButton.focus();
+    }
+
+    private static GoalIcon orDefault(GoalIcon icon) {
+        return icon == null ? GoalIcon.DEFAULT : icon;
+    }
+
     private void save() {
         hideError();
         if (!binder.validate().isOk()) {
@@ -233,7 +334,7 @@ public class GoalDialog extends Dialog {
             return;
         }
         GoalInput input = new GoalInput(draft.getName(), draft.getTarget(), draft.getTargetDate(),
-                draft.getPriority(), draft.getDescription());
+                draft.getPriority(), draft.getDescription(), iconChoice);
         String message;
         try {
             if (isNew()) {

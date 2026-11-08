@@ -24,4 +24,11 @@ Das Skript läuft **nur bei leerem Volume**. Nach Schema-Änderungen:
 docker compose down -v && docker compose up -d
 ```
 
+Wer seine Daten behalten will, spielt stattdessen die passenden Skripte aus `migrations/`
+ein (mehrfach ausführbar):
+
+```bash
+docker exec -i cashbox-db mariadb -ucashbox -pcashbox cashbox < migrations/002-goal-icon.sql
+```
+
 Hibernate läuft mit `ddl-auto=validate` und prüft das Schema nur gegen.

@@ -43,6 +43,7 @@ import jakarta.annotation.security.PermitAll;
 public class DashboardView extends VerticalLayout {
 
     private final BookingService bookingService;
+    private final SavingsGoalService goalService;
     private final H2 accountName = new H2();
     private final Span balance = new Span();
     private final Span buffer = new Span();
@@ -51,6 +52,7 @@ public class DashboardView extends VerticalLayout {
 
     public DashboardView(BookingService bookingService, SavingsGoalService goalService) {
         this.bookingService = bookingService;
+        this.goalService = goalService;
         addClassName("page-content");
         addClassName("dashboard");
 
@@ -133,7 +135,7 @@ public class DashboardView extends VerticalLayout {
     }
 
     /** Eine Zielzeile; ein Tipp darauf führt zur Sparziel-Verwaltung. */
-    private static Component goalRow(AccountOverview.GoalInfo goal) {
+    private Component goalRow(AccountOverview.GoalInfo goal) {
         Span name = new Span(goal.name());
         name.addClassName("goal-row__name");
         Div title = new Div(name);
@@ -150,8 +152,10 @@ public class DashboardView extends VerticalLayout {
 
         ProgressBar bar = new ProgressBar(0, 1, progress(goal.assigned(), goal.target()));
 
+        Div body = new Div(head, bar);
+        body.addClassName("goal-row__body");
         RouterLink row = new RouterLink(GoalsView.class);
-        row.add(head, bar);
+        row.add(GoalAvatar.of(goal.id(), goal.icon(), goal.hasImage(), goalService, GoalAvatar.Size.SMALL), body);
         row.addClassNames("goal-row", "goal-row--link");
         row.setClassName("goal-row--inactive", !goal.status().acceptsMoney());
         return row;

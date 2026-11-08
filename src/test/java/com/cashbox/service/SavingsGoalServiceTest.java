@@ -1,5 +1,6 @@
 package com.cashbox.service;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -7,9 +8,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+
+import javax.imageio.ImageIO;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +24,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.cashbox.model.GoalIcon;
 import com.cashbox.model.GoalStatus;
 import com.cashbox.repository.SavingsGoalRepository;
 
@@ -243,7 +250,105 @@ class SavingsGoalServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.move(Long.MAX_VALUE, 0));
     }
 
+    // ------------------------------------------------------------------ Symbol und Bild
+
+    @Test
+    void newGoalHasDefaultSymbolUnlessChosen() {
+        GoalDetails plain = create(prefix + "Ohne");
+        assertNull(plain.icon(), "null = Standardsymbol");
+        assertFalse(plain.hasImage());
+
+        GoalDetails car = service.create(new GoalInput(prefix + "Auto", eur("10"), null, null, null,
+                new GoalIconChoice.Symbol(GoalIcon.CAR)));
+        assertEquals(GoalIcon.CAR, car.icon());
+        assertEquals(GoalIcon.CAR, fresh(car.id()).icon());
+    }
+
+    @Test
+    void imageReplacesSymbolAndSymbolRemovesImage() throws IOException {
+        GoalDetails goal = service.create(new GoalInput(prefix + "Urlaub", eur("10"), null, null, null,
+                new GoalIconChoice.Symbol(GoalIcon.AIRPLANE)));
+
+        GoalPhoto photo = samplePhoto();
+        ImageCrop crop = new ImageCrop(0.4, 0.5, 0.6);
+        goal = service.update(goal.id(), goal.version(), new GoalInput(goal.name(), eur("10"), null, null, null,
+                new GoalIconChoice.Image(photo, crop)), GoalStatus.ACTIVE);
+        assertTrue(goal.hasImage());
+        assertTrue(fresh(goal.id()).hasImage(), "Liste weiß vom Bild");
+        Long id = goal.id();
+        assertTrue(bookingService.getOverview().goals().stream()
+                .anyMatch(g -> g.id().equals(id) && g.hasImage()), "Übersicht weiß vom Bild");
+        assertArrayEquals(GoalImage.render(photo, crop).data(), service.findImage(id).orElseThrow().data());
+        StoredPhoto stored = service.findPhoto(id).orElseThrow();
+        assertArrayEquals(photo.data(), stored.photo().data(), "Quellbild bleibt zum Nachbearbeiten erhalten");
+        assertEquals(crop, stored.crop());
+
+        GoalDetails unchanged = service.update(id, goal.version(), input(goal.name(), eur("20")), GoalStatus.ACTIVE);
+        assertTrue(unchanged.hasImage(), "Ohne Angabe bleibt das Bild");
+
+        GoalDetails symbol = service.update(id, unchanged.version(), new GoalInput(goal.name(), eur("20"),
+                null, null, null, new GoalIconChoice.Symbol(GoalIcon.SUITCASE)), GoalStatus.ACTIVE);
+        assertFalse(symbol.hasImage());
+        assertEquals(GoalIcon.SUITCASE, symbol.icon());
+        assertTrue(service.findImage(id).isEmpty(), "Symbol entfernt das Bild");
+        assertTrue(service.findPhoto(id).isEmpty());
+    }
+
+    @Test
+    void cropOfStoredImageCanBeChangedWithoutUpload() throws IOException {
+        GoalPhoto photo = samplePhoto();
+        GoalDetails goal = service.create(new GoalInput(prefix + "Fahrrad", eur("10"), null, null, null,
+                new GoalIconChoice.Image(photo, ImageCrop.FULL)));
+        byte[] before = service.findImage(goal.id()).orElseThrow().data();
+
+        ImageCrop zoomed = new ImageCrop(0.2, 0.3, 0.5);
+        GoalDetails updated = service.update(goal.id(), goal.version(), new GoalInput(goal.name(), eur("10"),
+                null, null, null, new GoalIconChoice.Crop(zoomed)), GoalStatus.ACTIVE);
+
+        assertTrue(updated.hasImage());
+        StoredPhoto stored = service.findPhoto(goal.id()).orElseThrow();
+        assertEquals(zoomed, stored.crop());
+        assertArrayEquals(photo.data(), stored.photo().data(), "Quellbild unverändert");
+        byte[] after = service.findImage(goal.id()).orElseThrow().data();
+        assertFalse(java.util.Arrays.equals(before, after), "Angezeigtes Bild neu berechnet");
+        assertArrayEquals(GoalImage.render(photo, zoomed).data(), after);
+    }
+
+    @Test
+    void cropWithoutImageFails() {
+        GoalDetails goal = create(prefix + "Ohne Bild");
+
+        assertThrows(IllegalStateException.class, () -> service.update(goal.id(), goal.version(),
+                new GoalInput(goal.name(), eur("10"), null, null, null, new GoalIconChoice.Crop(ImageCrop.FULL)),
+                GoalStatus.ACTIVE));
+    }
+
+    @Test
+    void deletesGoalTogetherWithImage() throws IOException {
+        GoalDetails goal = service.create(new GoalInput(prefix + "Mit Bild", eur("10"), null, null, null,
+                new GoalIconChoice.Image(samplePhoto(), ImageCrop.FULL)));
+        assertTrue(goal.hasImage());
+
+        service.delete(goal.id(), goal.version());
+        goals.flush();
+
+        assertTrue(service.findImage(goal.id()).isEmpty());
+    }
+
     // ------------------------------------------------------------------ Hilfen
+
+    /** Buntes Testbild, damit verschiedene Ausschnitte verschiedene Bilder ergeben. */
+    private static GoalPhoto samplePhoto() throws IOException {
+        BufferedImage image = new BufferedImage(640, 480, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                image.setRGB(x, y, (x * 255 / 640) << 16 | (y * 255 / 480) << 8 | 0x40);
+            }
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", out);
+        return GoalPhoto.fromUpload(out.toByteArray());
+    }
 
     private GoalDetails create(String name) {
         return service.create(input(name, eur("100")));

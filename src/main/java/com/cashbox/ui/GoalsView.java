@@ -151,8 +151,10 @@ public class GoalsView extends VerticalLayout {
 
         ProgressBar bar = new ProgressBar(0, 1, DashboardView.progress(goal.assignedAmount(), goal.targetAmount()));
 
+        Div body = new Div(head, bar);
+        body.addClassName("goal-card__body");
         NativeButton card = new NativeButton();
-        card.add(head, bar);
+        card.add(GoalAvatar.of(goal.id(), goal.icon(), goal.hasImage(), service, GoalAvatar.Size.MEDIUM), body);
 
         List<String> meta = new ArrayList<>();
         if (goal.isFunded()) {
@@ -167,12 +169,12 @@ public class GoalsView extends VerticalLayout {
         if (!meta.isEmpty()) {
             Span metaLine = new Span(String.join(" · ", meta));
             metaLine.addClassName("goal-card__meta");
-            card.add(metaLine);
+            body.add(metaLine);
         }
         if (goal.description() != null) {
             Span description = new Span(goal.description());
             description.addClassName("goal-card__description");
-            card.add(description);
+            body.add(description);
         }
 
         card.setId("goal-card-" + goal.id());

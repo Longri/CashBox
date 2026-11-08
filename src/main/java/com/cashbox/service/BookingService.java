@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,7 @@ import com.cashbox.model.GoalStatus;
 import com.cashbox.model.SavingsGoal;
 import com.cashbox.repository.AccountRepository;
 import com.cashbox.repository.BookingRepository;
+import com.cashbox.repository.SavingsGoalImageRepository;
 import com.cashbox.repository.SavingsGoalRepository;
 
 /**
@@ -33,20 +35,24 @@ public class BookingService {
     private final AccountRepository accounts;
     private final SavingsGoalRepository goals;
     private final BookingRepository bookings;
+    private final SavingsGoalImageRepository images;
 
-    public BookingService(AccountRepository accounts, SavingsGoalRepository goals, BookingRepository bookings) {
+    public BookingService(AccountRepository accounts, SavingsGoalRepository goals, BookingRepository bookings,
+                          SavingsGoalImageRepository images) {
         this.accounts = accounts;
         this.goals = goals;
         this.bookings = bookings;
+        this.images = images;
     }
 
     @Transactional(readOnly = true)
     public AccountOverview getOverview() {
         Account account = loadAccount();
+        Set<Long> withImage = images.findGoalIdsWithImage(account.getId());
         List<AccountOverview.GoalInfo> goalInfos = goals.findByAccountId(account.getId()).stream()
                 .sorted(SavingsGoal.DISPLAY_ORDER)
                 .map(g -> new AccountOverview.GoalInfo(g.getId(), g.getName(), g.getAssignedAmount(),
-                        g.getTargetAmount(), g.getStatus()))
+                        g.getTargetAmount(), g.getStatus(), g.getIcon(), withImage.contains(g.getId())))
                 .toList();
         return new AccountOverview(account.getName(), account.getCurrentBalance(),
                 account.getUnassignedBuffer(), goalInfos);

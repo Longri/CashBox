@@ -86,9 +86,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Zielzeile im Dashboard als Link zur Sparziel-Seite */
+/* Zielzeile im Dashboard als Link zur Sparziel-Seite: Symbol links, daneben Kopf und Fortschritt */
 .goal-row--link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--lumo-space-m);
   margin: calc(var(--lumo-space-xs) * -1) calc(var(--lumo-space-s) * -1);
   padding: var(--lumo-space-xs) var(--lumo-space-s);
   border-radius: var(--lumo-border-radius-m);
@@ -98,6 +100,11 @@
 
 .goal-row--link:hover {
   background: var(--lumo-contrast-5pct);
+}
+
+.goal-row__body {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .goal-row--inactive {
@@ -244,8 +251,8 @@ html.goal-sorting * {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: var(--lumo-space-xs);
+  align-items: flex-start;
+  gap: var(--lumo-space-m);
   width: 100%;
   box-sizing: border-box;
   padding: var(--lumo-space-m);
@@ -272,6 +279,14 @@ html.goal-sorting * {
   outline-offset: 2px;
 }
 
+.goal-card__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lumo-space-xs);
+}
+
 .goal-card__meta {
   color: var(--lumo-secondary-text-color);
   font-size: var(--lumo-font-size-s);
@@ -286,6 +301,282 @@ html.goal-sorting * {
   color: var(--lumo-secondary-text-color);
   font-size: var(--lumo-font-size-s);
   white-space: pre-line;
+}
+
+/* ------------------------------------------------------------------ Sparziel-Symbol */
+
+/* Rundes Symbol bzw. eigenes Bild eines Sparziels (GoalAvatar) */
+.goal-avatar {
+  --goal-avatar-size: 2.5rem;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--goal-avatar-size);
+  height: var(--goal-avatar-size);
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--lumo-primary-color-10pct);
+  color: var(--lumo-primary-text-color);
+}
+
+.goal-avatar--s { --goal-avatar-size: 2.5rem; }
+.goal-avatar--m { --goal-avatar-size: 3rem; }
+.goal-avatar--l { --goal-avatar-size: 4rem; }
+
+.goal-avatar > vaadin-icon {
+  width: calc(var(--goal-avatar-size) * 0.5);
+  height: calc(var(--goal-avatar-size) * 0.5);
+}
+
+.goal-avatar--image {
+  background: var(--lumo-contrast-10pct);
+}
+
+.goal-avatar > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Sparziel-Dialog: Symbol links neben dem Namen */
+.goal-identity {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--lumo-space-m);
+  width: 100%;
+}
+
+.goal-identity > vaadin-text-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.goal-icon-button {
+  position: relative;
+  flex: none;
+  margin: 0 0 var(--lumo-space-xs);
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.goal-icon-button:hover > .goal-avatar {
+  box-shadow: 0 0 0 2px var(--lumo-primary-color-50pct);
+}
+
+.goal-icon-button:focus-visible {
+  outline: 2px solid var(--lumo-primary-color);
+  outline-offset: 2px;
+}
+
+/* Stift unten rechts: zeigt, dass sich das Symbol ändern lässt */
+.goal-icon-button__badge {
+  position: absolute;
+  right: -0.125rem;
+  bottom: -0.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--lumo-base-color);
+  box-shadow: var(--lumo-box-shadow-xs);
+  color: var(--lumo-primary-text-color);
+}
+
+.goal-icon-button__badge > vaadin-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* Auswahldialog: Upload + Raster der Standardsymbole */
+.icon-picker__content {
+  gap: var(--lumo-space-s);
+}
+
+.icon-picker__section {
+  margin-top: var(--lumo-space-s);
+  color: var(--lumo-secondary-text-color);
+  font-size: var(--lumo-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.icon-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr));
+  gap: var(--lumo-space-s);
+  width: 100%;
+}
+
+.icon-picker__option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  margin: 0;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--lumo-border-radius-l);
+  background: var(--lumo-contrast-5pct);
+  color: var(--lumo-body-text-color);
+  cursor: pointer;
+}
+
+.icon-picker__option > vaadin-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.icon-picker__option:hover {
+  background: var(--lumo-primary-color-10pct);
+  color: var(--lumo-primary-text-color);
+}
+
+.icon-picker__option[aria-pressed="true"] {
+  border-color: var(--lumo-primary-color);
+  background: var(--lumo-primary-color-10pct);
+  color: var(--lumo-primary-text-color);
+}
+
+.icon-picker__option:focus-visible {
+  outline: 2px solid var(--lumo-primary-color);
+  outline-offset: 2px;
+}
+
+/* Aktuelles eigenes Bild im Auswahldialog, daneben „Ausschnitt ändern“ */
+.icon-picker__current {
+  display: flex;
+  align-items: center;
+  gap: var(--lumo-space-m);
+  margin-bottom: var(--lumo-space-xs);
+}
+
+/* ------------------------------------------------------------------ Bildausschnitt (image-cropper.js) */
+
+cashbox-image-cropper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--lumo-space-m);
+}
+
+/* Quadratische Bühne; gezogen wird hier, daher kein Scrollen/Zoomen der Seite per Touch */
+.image-cropper__stage {
+  position: relative;
+  width: 100%;
+  max-width: 22rem;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--lumo-border-radius-l);
+  background: #1c1c1e;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.image-cropper__stage--dragging {
+  cursor: grabbing;
+}
+
+.image-cropper__stage:focus-visible {
+  outline: 2px solid var(--lumo-primary-color);
+  outline-offset: 2px;
+}
+
+/* Bild in Originalgröße; Lage und Maßstab setzt das Skript per transform */
+.image-cropper__image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  transform-origin: 0 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Hintergrund im Kreis – so sieht der Rand später aus, wenn das Bild kleiner als der Kreis ist.
+   Gleiche Lage wie .image-cropper__frame, liegt aber unter dem Bild. */
+.image-cropper__backdrop {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: linear-gradient(var(--lumo-contrast-10pct), var(--lumo-contrast-10pct)), var(--lumo-base-color);
+}
+
+/* Kreis = späteres Symbol. Der Rand drumherum zeigt das Bild abgedunkelt.
+   Das Skript liest die Größe des Kreises aus – inset bestimmt also den Rand. */
+.image-cropper__frame {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 0 100vmax rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.image-cropper__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--lumo-space-s);
+  width: 100%;
+  max-width: 22rem;
+}
+
+.image-cropper__zoom {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--lumo-primary-color);
+}
+
+.image-cropper__zoom-button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--lumo-contrast-5pct);
+  color: var(--lumo-secondary-text-color);
+  cursor: pointer;
+}
+
+.image-cropper__zoom-button > vaadin-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.image-cropper__zoom-button:hover:not(:disabled) {
+  background: var(--lumo-contrast-10pct);
+  color: var(--lumo-body-text-color);
+}
+
+.image-cropper__zoom-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.image-cropper__zoom-button:focus-visible {
+  outline: 2px solid var(--lumo-primary-color);
+  outline-offset: 2px;
+}
+
+.crop-dialog__content {
+  gap: var(--lumo-space-m);
 }
 
 /* ------------------------------------------------------------------ Dialoge (Buchung, Sparziel) */
