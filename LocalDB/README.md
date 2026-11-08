@@ -29,6 +29,7 @@ ein (mehrfach ausführbar):
 
 ```bash
 docker exec -i cashbox-db mariadb -ucashbox -pcashbox cashbox < migrations/002-goal-icon.sql
+docker exec -i cashbox-db mariadb -ucashbox -pcashbox cashbox < migrations/003-remember-me.sql
 ```
 
 Hibernate läuft mit `ddl-auto=validate` und prüft das Schema nur gegen.
