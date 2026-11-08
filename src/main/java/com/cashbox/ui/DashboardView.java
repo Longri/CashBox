@@ -2,14 +2,20 @@ package com.cashbox.ui;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
+import com.cashbox.model.GoalStatus;
 import com.cashbox.service.AccountOverview;
 import com.cashbox.service.BookingService;
 import com.cashbox.service.Pot;
+import com.cashbox.service.SavingsGoalService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.dependency.JavaScript;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.H3;
@@ -26,10 +32,14 @@ import jakarta.annotation.security.PermitAll;
 
 /**
  * Startseite: Kontostand, Puffer, Sparziele und der Einstieg in Ein- und Umbuchungen.
+ * <p>
+ * Die Sparziele lassen sich wie auf der Sparziel-Seite am Griff umsortieren ({@link GoalSorting});
+ * da hier alle Status in einer Liste stehen, wird jeweils nur innerhalb desselben Status verschoben.
  */
 @Route("")
 @PageTitle("Übersicht | CashBox")
 @PermitAll
+@JavaScript(GoalSorting.SCRIPT)
 public class DashboardView extends VerticalLayout {
 
     private final BookingService bookingService;
@@ -37,8 +47,9 @@ public class DashboardView extends VerticalLayout {
     private final Span balance = new Span();
     private final Span buffer = new Span();
     private final Div goalList = new Div();
+    private final GoalSorting sorting;
 
-    public DashboardView(BookingService bookingService) {
+    public DashboardView(BookingService bookingService, SavingsGoalService goalService) {
         this.bookingService = bookingService;
         addClassName("page-content");
         addClassName("dashboard");
@@ -57,6 +68,8 @@ public class DashboardView extends VerticalLayout {
         actions.addClassName("booking-actions");
 
         goalList.addClassName("goal-list");
+        goalList.setId("dashboard-goal-list");
+        sorting = new GoalSorting(goalList, goalService, this::refresh);
         accountName.addClassName("dashboard-title");
 
         RouterLink manage = new RouterLink("Verwalten", GoalsView.class);
@@ -81,6 +94,11 @@ public class DashboardView extends VerticalLayout {
         new BookingDialog(bookingService, mode, this::refresh).open();
     }
 
+    /** Wie nach dem Ablegen im Browser: Position innerhalb des Status speichern und neu anzeigen. */
+    void moveGoal(long id, int index, boolean keyboard) {
+        sorting.move(id, index, keyboard);
+    }
+
     private void refresh() {
         AccountOverview overview = bookingService.getOverview();
         accountName.setText(overview.accountName());
@@ -88,6 +106,7 @@ public class DashboardView extends VerticalLayout {
         buffer.setText(Money.format(overview.buffer()));
 
         goalList.removeAll();
+        sorting.clear();
         if (overview.goals().isEmpty()) {
             RouterLink create = new RouterLink("Sparziel anlegen", GoalsView.class);
             create.setId("goals-create-link");
@@ -96,7 +115,21 @@ public class DashboardView extends VerticalLayout {
             goalList.add(empty);
             return;
         }
-        overview.goals().forEach(goal -> goalList.add(goalRow(goal)));
+        // Griff nur in Status mit mehreren Zielen; die übrigen bekommen gleich breiten Leerraum,
+        // damit alle Zeilen bündig stehen. Gibt es nirgends etwas zu sortieren, entfällt beides.
+        Map<GoalStatus, Long> perStatus = overview.goals().stream()
+                .collect(Collectors.groupingBy(AccountOverview.GoalInfo::status, Collectors.counting()));
+        boolean anySortable = perStatus.values().stream().anyMatch(count -> count > 1);
+        Function<GoalStatus, GoalSorting.Handle> handleFor = status -> !anySortable
+                ? GoalSorting.Handle.NONE
+                : perStatus.get(status) > 1 ? GoalSorting.Handle.GRIP : GoalSorting.Handle.SPACER;
+
+        overview.goals().forEach(goal -> {
+            Div item = sorting.item(goal.id(), goal.name(), goal.status(), handleFor.apply(goal.status()),
+                    goalRow(goal));
+            item.addClassName("goal-item--row");
+            goalList.add(item);
+        });
     }
 
     /** Eine Zielzeile; ein Tipp darauf führt zur Sparziel-Verwaltung. */

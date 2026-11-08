@@ -12,6 +12,7 @@ import com.cashbox.service.SavingsGoalService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.dependency.JavaScript;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.NativeButton;
@@ -32,10 +33,14 @@ import jakarta.annotation.security.PermitAll;
  * Sparziel-Verwaltung: Ziele anlegen, bearbeiten, pausieren, als erreicht markieren
  * und – solange sie leer sind und keine Buchungen haben – löschen.
  * Die Ziele sind nach Status auf Reiter verteilt; ein Tipp auf ein Ziel öffnet den {@link GoalDialog}.
+ * <p>
+ * Die Reihenfolge (= Priorität) lässt sich ändern, indem man ein Ziel am Griff links nach oben oder
+ * unten zieht – mit Maus, Finger oder per Pfeiltasten auf dem Griff (siehe {@link GoalSorting}).
  */
 @Route("goals")
 @PageTitle("Sparziele | CashBox")
 @PermitAll
+@JavaScript(GoalSorting.SCRIPT)
 public class GoalsView extends VerticalLayout {
 
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy");
@@ -44,6 +49,7 @@ public class GoalsView extends VerticalLayout {
     private final Map<GoalStatus, Tab> statusTabs = new EnumMap<>(GoalStatus.class);
     private final Tabs tabs = new Tabs();
     private final Div goalList = new Div();
+    private final GoalSorting sorting;
     private List<GoalDetails> goals = List.of();
 
     public GoalsView(SavingsGoalService service) {
@@ -71,6 +77,7 @@ public class GoalsView extends VerticalLayout {
 
         goalList.addClassName("goal-list");
         goalList.setId("goal-list");
+        sorting = new GoalSorting(goalList, service, this::refresh);
 
         add(header, tabs, goalList);
         refresh();
@@ -85,6 +92,11 @@ public class GoalsView extends VerticalLayout {
                 }
                 : this::refresh;
         new GoalDialog(service, goal, onSaved).open();
+    }
+
+    /** Wie nach dem Ablegen im Browser: Position innerhalb des Status speichern und neu anzeigen. */
+    void moveGoal(long id, int index, boolean keyboard) {
+        sorting.move(id, index, keyboard);
     }
 
     private void refresh() {
@@ -107,12 +119,18 @@ public class GoalsView extends VerticalLayout {
         List<GoalDetails> shown = goals.stream().filter(g -> g.status() == status).toList();
 
         goalList.removeAll();
+        sorting.clear();
         if (goals.isEmpty()) {
             goalList.add(emptyHint("Noch keine Sparziele angelegt. Mit „Neues Sparziel“ legst du das erste an."));
         } else if (shown.isEmpty()) {
             goalList.add(emptyHint("Keine Sparziele mit Status „" + status.getLabel() + "“."));
         } else {
-            shown.forEach(goal -> goalList.add(card(goal)));
+            GoalSorting.Handle handle = shown.size() > 1 ? GoalSorting.Handle.GRIP : GoalSorting.Handle.NONE;
+            shown.forEach(goal -> {
+                Div item = sorting.item(goal.id(), goal.name(), goal.status(), handle, card(goal));
+                item.addClassName("goal-item--card");
+                goalList.add(item);
+            });
         }
     }
 

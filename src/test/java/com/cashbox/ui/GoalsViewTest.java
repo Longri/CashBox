@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,7 @@ import com.vaadin.browserless.SpringBrowserlessTest;
 import com.vaadin.browserless.SpringSecurityContextHandler;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.NativeButton;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
@@ -139,10 +141,35 @@ class GoalsViewTest extends SpringBrowserlessTest {
                 $(TextField.class).withId("goal-target").single().getHelperText());
     }
 
+    @Test
+    void movingGoalReordersCardsAndShowsHandles() {
+        GoalDetails a = service.create(new GoalInput(prefix + "A", new BigDecimal("10"), null, null, null));
+        GoalDetails b = service.create(new GoalInput(prefix + "B", new BigDecimal("10"), null, null, null));
+        navigate(GoalsView.class);
+        assertEquals(1, $(NativeButton.class).withId("goal-handle-" + b.id()).all().size(),
+                "Bei mehreren Zielen hat jede Karte einen Ziehgriff");
+
+        List<Long> before = shownIds();
+        $(GoalsView.class).single().moveGoal(b.id(), before.indexOf(a.id()), false);
+
+        List<Long> after = shownIds();
+        assertEquals(after.indexOf(b.id()) + 1, after.indexOf(a.id()), "B steht jetzt direkt vor A");
+        assertEquals(after, service.findAll().stream()
+                .filter(g -> g.status() == GoalStatus.ACTIVE).map(GoalDetails::id).toList());
+        assertEquals(after.indexOf(b.id()) + 1, find(b.name()).priority());
+    }
+
     // ------------------------------------------------------------------ Hilfen
 
-    private java.util.List<NativeButton> card(GoalDetails goal) {
+    private List<NativeButton> card(GoalDetails goal) {
         return $(NativeButton.class).withId("goal-card-" + goal.id()).all();
+    }
+
+    /** IDs der Karten in der angezeigten Reihenfolge. */
+    private List<Long> shownIds() {
+        return $(Div.class).withId("goal-list").single().getChildren()
+                .map(item -> Long.valueOf(item.getElement().getAttribute("data-goal-id")))
+                .toList();
     }
 
     private GoalDetails find(String name) {

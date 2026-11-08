@@ -142,8 +142,107 @@
   font-size: var(--lumo-font-size-xl);
 }
 
+/* Sortierbarer Listeneintrag: optionaler Ziehgriff links + Inhalt (Sortieren siehe goal-sort.js) */
+.goal-item {
+  display: flex;
+  align-items: stretch;
+  border-radius: var(--lumo-border-radius-l);
+}
+
+/* Sparziel-Seite: Eintrag als Karte */
+.goal-item--card {
+  background: var(--lumo-contrast-5pct);
+}
+
+/* Übersicht: Zeile ohne Hintergrund. Die negativen Ränder (sonst an .goal-row--link)
+   sitzen am Eintrag, damit der Griff mit in der Hover-Fläche liegt. */
+.goal-item--row {
+  margin: calc(var(--lumo-space-xs) * -1) calc(var(--lumo-space-s) * -1);
+  border-radius: var(--lumo-border-radius-m);
+}
+
+.goal-item--row > .goal-row--link {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.goal-item--row > .goal-item__handle {
+  border-radius: var(--lumo-border-radius-m) 0 0 var(--lumo-border-radius-m);
+}
+
+.goal-item--row > .goal-item__handle + .goal-row--link,
+.goal-item--row > .goal-item__spacer + .goal-row--link {
+  padding-left: 0;
+  border-radius: 0 var(--lumo-border-radius-m) var(--lumo-border-radius-m) 0;
+}
+
+/* Leerraum in Griffbreite für Einträge, die allein in ihrem Status sind */
+.goal-item__spacer {
+  flex: none;
+  width: 2.5rem;
+}
+
+/* Ziehgriff: natives <button> mit sechs Punkten */
+.goal-item__handle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--lumo-border-radius-l) 0 0 var(--lumo-border-radius-l);
+  background: transparent;
+  color: var(--lumo-tertiary-text-color);
+  cursor: grab;
+  touch-action: none; /* auf Touch-Geräten ziehen statt scrollen */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.goal-item__handle::before {
+  content: "";
+  width: 12px;
+  height: 18px;
+  background: radial-gradient(circle, currentColor 1.5px, transparent 2px) 0 0 / 6px 6px;
+}
+
+.goal-item__handle:hover {
+  background: var(--lumo-contrast-5pct);
+  color: var(--lumo-secondary-text-color);
+}
+
+.goal-item__handle:focus-visible {
+  outline: 2px solid var(--lumo-primary-color);
+  outline-offset: -2px;
+}
+
+/* Gezogene Karte schwebt über der Liste */
+.goal-item--dragging {
+  background: linear-gradient(var(--lumo-contrast-5pct), var(--lumo-contrast-5pct)), var(--lumo-base-color);
+  box-shadow: var(--lumo-box-shadow-m);
+}
+
+.goal-item-placeholder {
+  box-sizing: border-box;
+  border: 2px dashed var(--lumo-contrast-20pct);
+  border-radius: var(--lumo-border-radius-l);
+}
+
+html.goal-sorting,
+html.goal-sorting * {
+  cursor: grabbing !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* Antippbare Karte: natives <button>, Browser-Styles zurücksetzen */
 .goal-card {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--lumo-space-xs);
@@ -152,15 +251,20 @@
   padding: var(--lumo-space-m);
   border: none;
   border-radius: var(--lumo-border-radius-l);
-  background: var(--lumo-contrast-5pct);
+  background: transparent;
   color: inherit;
   font: inherit;
   text-align: start;
   cursor: pointer;
 }
 
+.goal-item__handle + .goal-card {
+  padding-left: 0;
+  border-radius: 0 var(--lumo-border-radius-l) var(--lumo-border-radius-l) 0;
+}
+
 .goal-card:hover {
-  background: var(--lumo-contrast-10pct);
+  background: var(--lumo-contrast-5pct);
 }
 
 .goal-card:focus-visible {

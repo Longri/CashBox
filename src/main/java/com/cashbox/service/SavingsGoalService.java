@@ -1,6 +1,7 @@
 package com.cashbox.service;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -89,6 +90,33 @@ public class SavingsGoalService {
         applyOptionalFields(goal, input);
         goal.setStatus(status);
         return GoalDetails.of(saveAndFlush(goal));
+    }
+
+    /**
+     * Schiebt ein Sparziel innerhalb seines Status an eine neue Position (Ziehen in der Liste)
+     * und nummeriert die Priorität aller Ziele dieses Status neu: 1 = ganz oben.
+     * Ziele ohne Priorität bekommen dabei ebenfalls eine, damit Position und Priorität übereinstimmen.
+     *
+     * @param newIndex Zielposition in der Liste des Status (0 = ganz oben); wird auf die Listengrenzen begrenzt
+     * @throws org.springframework.dao.OptimisticLockingFailureException wenn ein Ziel gleichzeitig geändert wurde
+     */
+    @Transactional
+    public void move(Long id, int newIndex) {
+        Account account = loadAccount();
+        SavingsGoal goal = loadGoal(account, id, null);
+        List<SavingsGoal> group = new ArrayList<>(goals.findByAccountId(account.getId()).stream()
+                .filter(g -> g.getStatus() == goal.getStatus() && !g.getId().equals(goal.getId()))
+                .sorted(SavingsGoal.DISPLAY_ORDER)
+                .toList());
+        if (group.size() + 1 > MAX_PRIORITY) {
+            throw new IllegalStateException("Mehr als " + MAX_PRIORITY + " Sparziele lassen sich nicht sortieren.");
+        }
+        group.add(Math.clamp(newIndex, 0, group.size()), goal);
+        for (int i = 0; i < group.size(); i++) {
+            group.get(i).setPriority(MIN_PRIORITY + i);
+        }
+        // Sofort schreiben, damit Konflikte (Optimistic Locking) hier und nicht erst beim Commit auffallen.
+        goals.flush();
     }
 
     /** {@code true}, wenn das Ziel leer ist und keine Buchungen hat. */

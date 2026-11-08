@@ -149,7 +149,8 @@ public class GoalDialog extends Dialog {
         priority.setMin(SavingsGoalService.MIN_PRIORITY);
         priority.setMax(SavingsGoalService.MAX_PRIORITY);
         priority.setStepButtonsVisible(true);
-        priority.setHelperText("1 = am wichtigsten. Bestimmt die Reihenfolge der Sparziele.");
+        priority.setHelperText("1 = am wichtigsten. Bestimmt die Reihenfolge der Sparziele – "
+                + "die du in der Liste auch per Ziehen am Griff ändern kannst.");
 
         description.setId("goal-description");
         description.setWidthFull();

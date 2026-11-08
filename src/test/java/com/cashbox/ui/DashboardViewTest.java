@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,10 +21,15 @@ import com.cashbox.repository.AccountRepository;
 import com.cashbox.repository.SavingsGoalRepository;
 import com.cashbox.service.AccountOverview;
 import com.cashbox.service.BookingService;
+import com.cashbox.service.GoalDetails;
+import com.cashbox.service.GoalInput;
 import com.cashbox.service.Pot;
+import com.cashbox.service.SavingsGoalService;
 import com.vaadin.browserless.SpringBrowserlessTest;
 import com.vaadin.browserless.SpringSecurityContextHandler;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.NativeButton;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.TextField;
@@ -37,6 +43,7 @@ class DashboardViewTest extends SpringBrowserlessTest {
     @Autowired BookingService service;
     @Autowired AccountRepository accounts;
     @Autowired SavingsGoalRepository goals;
+    @Autowired SavingsGoalService goalService;
 
     @BeforeEach
     void open() {
@@ -139,5 +146,59 @@ class DashboardViewTest extends SpringBrowserlessTest {
 
         assertFalse(target.getItemEnabledProvider().test(pausedPot), "Pausiertes Ziel darf nicht wählbar sein");
         assertFalse(pausedPot.equals(target.getValue()), "Pausiertes Ziel darf nicht vorbelegt sein");
+    }
+
+    @Test
+    void movingGoalReordersRowsWithinItsStatus() {
+        String prefix = "Test-" + System.nanoTime() + "-";
+        GoalDetails a = goalService.create(new GoalInput(prefix + "A", new BigDecimal("10"), null, null, null));
+        GoalDetails b = goalService.create(new GoalInput(prefix + "B", new BigDecimal("10"), null, null, null));
+        reopen();
+        assertEquals(1, $(NativeButton.class).withId("goal-handle-" + b.id()).all().size(),
+                "Aktive Ziele haben einen Ziehgriff");
+
+        List<Long> before = shownIds(GoalStatus.ACTIVE);
+        $(DashboardView.class).single().moveGoal(b.id(), before.indexOf(a.id()), false);
+
+        List<Long> after = shownIds(GoalStatus.ACTIVE);
+        assertEquals(after.indexOf(b.id()) + 1, after.indexOf(a.id()), "B steht jetzt direkt vor A");
+        assertEquals(after, goalService.findAll().stream()
+                .filter(g -> g.status() == GoalStatus.ACTIVE).map(GoalDetails::id).toList());
+    }
+
+    @Test
+    void rowsStayAlignedWhenSomeStatusHasNothingToSort() {
+        Account account = accounts.findFirstByOrderByIdAsc().orElseThrow();
+        goals.save(new SavingsGoal(account, "Test-Aktiv1-" + System.nanoTime(), new BigDecimal("10.00")));
+        goals.save(new SavingsGoal(account, "Test-Aktiv2-" + System.nanoTime(), new BigDecimal("10.00")));
+        SavingsGoal paused = new SavingsGoal(account, "Test-Pausiert-" + System.nanoTime(), new BigDecimal("10.00"));
+        paused.setStatus(GoalStatus.PAUSED);
+        goals.save(paused);
+        reopen();
+
+        // Jede Zeile beginnt mit Griff oder gleich breitem Leerraum – nie mit dem Inhalt.
+        goalList().getChildren().forEach(item -> {
+            String first = item.getChildren().findFirst().orElseThrow().getElement().getAttribute("class");
+            assertTrue(first.contains("goal-item__handle") || first.contains("goal-item__spacer"),
+                    "Zeile " + item.getElement().getAttribute("data-goal-id") + " beginnt mit „" + first + "“");
+        });
+    }
+
+    /** Neu aufbauen, damit gerade angelegte Ziele erscheinen (dieselbe Route würde die View wiederverwenden). */
+    private void reopen() {
+        navigate(GoalsView.class);
+        navigate(DashboardView.class);
+    }
+
+    private Div goalList() {
+        return $(Div.class).withId("dashboard-goal-list").single();
+    }
+
+    /** IDs der Zeilen eines Status in der angezeigten Reihenfolge. */
+    private List<Long> shownIds(GoalStatus status) {
+        return goalList().getChildren()
+                .filter(item -> status.name().equals(item.getElement().getAttribute("data-sort-group")))
+                .map(item -> Long.valueOf(item.getElement().getAttribute("data-goal-id")))
+                .toList();
     }
 }

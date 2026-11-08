@@ -191,6 +191,58 @@ class SavingsGoalServiceTest {
         assertEquals(List.of("D-Prio-1", "C-Prio-2", "B-ohne-Prio", "A-pausiert"), names);
     }
 
+    @Test
+    void moveUpPutsGoalAtTargetPositionAndRenumbersPriorities() {
+        GoalDetails a = create(prefix + "A");
+        GoalDetails b = create(prefix + "B");
+        GoalDetails c = create(prefix + "C");
+
+        service.move(c.id(), activeIds().indexOf(a.id()));
+
+        assertEquals(List.of("C", "A", "B"), testNames(GoalStatus.ACTIVE));
+        assertPrioritiesFollowPosition(GoalStatus.ACTIVE);
+        assertEquals(1 + activeIds().indexOf(c.id()), fresh(c.id()).priority());
+        assertTrue(fresh(b.id()).version() > b.version(), "Neue Priorität erhöht die Version");
+    }
+
+    @Test
+    void moveDownAndOutOfRangeIndexIsClamped() {
+        GoalDetails a = create(prefix + "A");
+        create(prefix + "B");
+        GoalDetails c = create(prefix + "C");
+
+        service.move(a.id(), activeIds().indexOf(c.id()));
+        assertEquals(List.of("B", "C", "A"), testNames(GoalStatus.ACTIVE));
+
+        service.move(a.id(), -5);
+        assertEquals(a.id(), activeIds().getFirst());
+        assertEquals(1, fresh(a.id()).priority());
+
+        service.move(a.id(), 10_000);
+        assertEquals(a.id(), activeIds().getLast());
+        assertPrioritiesFollowPosition(GoalStatus.ACTIVE);
+    }
+
+    @Test
+    void moveOnlyRenumbersGoalsWithTheSameStatus() {
+        GoalDetails a = create(prefix + "A");
+        GoalDetails b = create(prefix + "B");
+        GoalDetails paused = service.create(new GoalInput(prefix + "Pausiert", eur("10"), null, 7, null));
+        paused = service.update(paused.id(), paused.version(), new GoalInput(paused.name(), eur("10"), null, 7, null),
+                GoalStatus.PAUSED);
+
+        service.move(b.id(), activeIds().indexOf(a.id()));
+
+        assertEquals(List.of("B", "A"), testNames(GoalStatus.ACTIVE));
+        assertEquals(7, fresh(paused.id()).priority());
+        assertEquals(paused.version(), fresh(paused.id()).version());
+    }
+
+    @Test
+    void moveRejectsUnknownGoal() {
+        assertThrows(IllegalArgumentException.class, () -> service.move(Long.MAX_VALUE, 0));
+    }
+
     // ------------------------------------------------------------------ Hilfen
 
     private GoalDetails create(String name) {
@@ -204,6 +256,26 @@ class SavingsGoalServiceTest {
     /** Aktueller Stand inkl. Version (die Abfrage schreibt offene Änderungen vorher in die Datenbank). */
     private GoalDetails fresh(Long id) {
         return service.findAll().stream().filter(g -> g.id().equals(id)).findFirst().orElseThrow();
+    }
+
+    private List<Long> activeIds() {
+        return service.findAll().stream().filter(g -> g.status() == GoalStatus.ACTIVE).map(GoalDetails::id).toList();
+    }
+
+    /** Namen der Testziele (ohne Präfix) eines Status in Anzeigereihenfolge. */
+    private List<String> testNames(GoalStatus status) {
+        return service.findAll().stream()
+                .filter(g -> g.status() == status && g.name().startsWith(prefix))
+                .map(g -> g.name().substring(prefix.length()))
+                .toList();
+    }
+
+    /** Nach dem Verschieben gilt für alle Ziele des Status: Priorität = Position + 1. */
+    private void assertPrioritiesFollowPosition(GoalStatus status) {
+        List<GoalDetails> group = service.findAll().stream().filter(g -> g.status() == status).toList();
+        for (int i = 0; i < group.size(); i++) {
+            assertEquals(i + 1, group.get(i).priority(), "Priorität von „" + group.get(i).name() + "“");
+        }
     }
 
     private static BigDecimal eur(String value) {

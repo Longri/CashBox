@@ -19,6 +19,9 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // Eigene statische Skripte aus META-INF/resources (Stylesheets gibt Vaadin selbst frei).
+        // Muss vor der Vaadin-Konfiguration stehen, die alle übrigen Anfragen absichert.
+        http.authorizeHttpRequests(auth -> auth.requestMatchers("/goal-sort.js").permitAll());
         http.with(VaadinSecurityConfigurer.vaadin(), vaadin -> vaadin.loginView(LoginView.class));
         return http.build();
     }
