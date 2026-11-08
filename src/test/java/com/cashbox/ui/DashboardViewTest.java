@@ -28,6 +28,7 @@ import com.cashbox.service.SavingsGoalService;
 import com.vaadin.browserless.SpringBrowserlessTest;
 import com.vaadin.browserless.SpringSecurityContextHandler;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.NativeButton;
 import com.vaadin.flow.component.html.Span;
@@ -149,6 +150,96 @@ class DashboardViewTest extends SpringBrowserlessTest {
     }
 
     @Test
+    void withdrawFromBufferThroughDialog() {
+        service.deposit(new BigDecimal("20"), null, null);
+        AccountOverview before = service.getOverview();
+
+        test($(Button.class).withId("withdraw").single()).click();
+        Select<Pot> source = $(Select.class).withId("booking-source").single();
+        assertTrue(source.getValue().isBuffer(), "Von sollte mit dem Puffer vorbelegt sein");
+        assertTrue($(Select.class).withId("booking-target").all().isEmpty(), "Beim Ausbuchen gibt es kein Ziel");
+        TextField amount = $(TextField.class).withId("booking-amount").single();
+        assertFalse(amount.isReadOnly());
+        test(amount).setValue("7,25");
+        assertEquals(Money.format(new BigDecimal("7.25")) + " ausbuchen", $(Button.class).withId("booking-save").single().getText());
+        test($(Button.class).withId("booking-save").single()).click();
+
+        assertTrue($(BookingDialog.class).all().isEmpty(), "Dialog sollte nach dem Buchen geschlossen sein");
+        AccountOverview after = service.getOverview();
+        assertEquals(before.balance().subtract(new BigDecimal("7.25")), after.balance());
+        assertEquals(before.buffer().subtract(new BigDecimal("7.25")), after.buffer());
+        assertEquals(Money.format(after.balance()), $(Span.class).withId("balance").single().getText());
+    }
+
+    @Test
+    void bufferWithdrawalCannotExceedBuffer() {
+        test($(Button.class).withId("withdraw").single()).click();
+        test($(Select.class).withId("booking-source").single()).selectItem(Pot.BUFFER_NAME);
+        TextField amount = $(TextField.class).withId("booking-amount").single();
+        test(amount).setValue(Money.formatPlain(service.getOverview().buffer().add(new BigDecimal("0.01"))));
+        test($(Button.class).withId("booking-save").single()).click();
+
+        assertFalse($(BookingDialog.class).all().isEmpty());
+        assertTrue(amount.isInvalid());
+        assertTrue(amount.getErrorMessage().startsWith("Nicht genug Geld"));
+    }
+
+    @Test
+    void withdrawingGoalLocksAmountAndMarksGoalReached() {
+        Account account = accounts.findFirstByOrderByIdAsc().orElseThrow();
+        SavingsGoal goal = goals.save(new SavingsGoal(account, "Test-Ziel-" + System.nanoTime(), new BigDecimal("100.00")));
+        service.deposit(new BigDecimal("42"), goal.getId(), null);
+        BigDecimal balanceBefore = service.getOverview().balance();
+
+        test($(Button.class).withId("withdraw").single()).click();
+        TextField amount = $(TextField.class).withId("booking-amount").single();
+        test(amount).setValue("3");
+        test($(Select.class).withId("booking-source").single()).selectItem(goal.getName());
+
+        assertEquals("42,00", amount.getValue(), "Ein Sparziel wird immer komplett ausgebucht");
+        assertTrue(amount.isReadOnly());
+        assertTrue($(Button.class).withId("booking-max").all().isEmpty(), "„Alles“ entfällt bei festem Betrag");
+        Checkbox markReached = $(Checkbox.class).withId("booking-mark-reached").single();
+        assertTrue(markReached.isVisible() && markReached.getValue(), "Erreicht ist vorausgewählt");
+
+        // Zurück zum Puffer: eigene Eingabe ist wieder da und frei änderbar
+        test($(Select.class).withId("booking-source").single()).selectItem(Pot.BUFFER_NAME);
+        assertEquals("3", amount.getValue());
+        assertFalse(amount.isReadOnly());
+        assertFalse(markReached.isVisible());
+
+        test($(Select.class).withId("booking-source").single()).selectItem(goal.getName());
+        test($(Button.class).withId("booking-save").single()).click();
+
+        assertTrue($(BookingDialog.class).all().isEmpty(), "Dialog sollte nach dem Buchen geschlossen sein");
+        AccountOverview.GoalInfo after = service.getOverview().goals().stream()
+                .filter(g -> g.id().equals(goal.getId())).findFirst().orElseThrow();
+        assertEquals(0, after.assigned().signum());
+        assertEquals(GoalStatus.REACHED, after.status());
+        assertEquals(balanceBefore.subtract(new BigDecimal("42.00")), service.getOverview().balance());
+        assertTrue(goalList().getChildren().noneMatch(
+                        item -> String.valueOf(goal.getId()).equals(item.getElement().getAttribute("data-goal-id"))),
+                "Erreichtes Ziel verschwindet aus der Übersicht");
+    }
+
+    @Test
+    void reachedGoalCanBeWithdrawnWithoutStatusCheckbox() {
+        Account account = accounts.findFirstByOrderByIdAsc().orElseThrow();
+        SavingsGoal goal = goals.save(new SavingsGoal(account, "Test-Ziel-" + System.nanoTime(), new BigDecimal("10.00")));
+        service.deposit(new BigDecimal("10"), goal.getId(), null);
+        goal.setStatus(GoalStatus.REACHED);
+        goals.saveAndFlush(goal);
+
+        test($(Button.class).withId("withdraw").single()).click();
+        test($(Select.class).withId("booking-source").single()).selectItem(goal.getName());
+        assertTrue($(Checkbox.class).withId("booking-mark-reached").all().isEmpty(), "Ist schon erreicht");
+        test($(Button.class).withId("booking-save").single()).click();
+
+        assertTrue($(BookingDialog.class).all().isEmpty());
+        assertEquals(0, goals.findById(goal.getId()).orElseThrow().getAssignedAmount().signum());
+    }
+
+    @Test
     void movingGoalReordersRowsWithinItsStatus() {
         String prefix = "Test-" + System.nanoTime() + "-";
         GoalDetails a = goalService.create(new GoalInput(prefix + "A", new BigDecimal("10"), null, null, null));
@@ -167,21 +258,24 @@ class DashboardViewTest extends SpringBrowserlessTest {
     }
 
     @Test
-    void rowsStayAlignedWhenSomeStatusHasNothingToSort() {
+    void showsOnlyActiveGoals() {
         Account account = accounts.findFirstByOrderByIdAsc().orElseThrow();
-        goals.save(new SavingsGoal(account, "Test-Aktiv1-" + System.nanoTime(), new BigDecimal("10.00")));
-        goals.save(new SavingsGoal(account, "Test-Aktiv2-" + System.nanoTime(), new BigDecimal("10.00")));
+        SavingsGoal active = goals.save(new SavingsGoal(account, "Test-Aktiv-" + System.nanoTime(), new BigDecimal("10.00")));
         SavingsGoal paused = new SavingsGoal(account, "Test-Pausiert-" + System.nanoTime(), new BigDecimal("10.00"));
         paused.setStatus(GoalStatus.PAUSED);
         goals.save(paused);
+        SavingsGoal reached = new SavingsGoal(account, "Test-Erreicht-" + System.nanoTime(), new BigDecimal("10.00"));
+        reached.setStatus(GoalStatus.REACHED);
+        goals.save(reached);
         reopen();
 
-        // Jede Zeile beginnt mit Griff oder gleich breitem Leerraum – nie mit dem Inhalt.
-        goalList().getChildren().forEach(item -> {
-            String first = item.getChildren().findFirst().orElseThrow().getElement().getAttribute("class");
-            assertTrue(first.contains("goal-item__handle") || first.contains("goal-item__spacer"),
-                    "Zeile " + item.getElement().getAttribute("data-goal-id") + " beginnt mit „" + first + "“");
-        });
+        List<String> shownGroups = goalList().getChildren()
+                .map(item -> item.getElement().getAttribute("data-sort-group")).distinct().toList();
+        assertEquals(List.of(GoalStatus.ACTIVE.name()), shownGroups, "Nur aktive Ziele in der Übersicht");
+        List<Long> shown = shownIds(GoalStatus.ACTIVE);
+        assertTrue(shown.contains(active.getId()));
+        assertFalse(shown.contains(paused.getId()));
+        assertFalse(shown.contains(reached.getId()));
     }
 
     /** Neu aufbauen, damit gerade angelegte Ziele erscheinen (dieselbe Route würde die View wiederverwenden). */

@@ -178,7 +178,7 @@ public class SavingsGoalService {
 
     private String deleteBlocker(SavingsGoal goal) {
         if (goal.getAssignedAmount().signum() != 0) {
-            return "„" + goal.getName() + "“ enthält noch Geld. Buche es zuerst um.";
+            return "„" + goal.getName() + "“ enthält noch Geld. Buche es zuerst um oder aus.";
         }
         if (bookings.existsForGoal(goal.getId())) {
             return "„" + goal.getName() + "“ hat bereits Buchungen und kann nicht gelöscht werden. "

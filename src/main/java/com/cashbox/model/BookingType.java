@@ -8,6 +8,6 @@ public enum BookingType {
     DEPOSIT,
     /** Geld wird zwischen Puffer und Sparzielen verschoben. */
     TRANSFER,
-    /** Geld verlässt das Sparkonto (Sparziel wird ausgegeben). */
+    /** Geld verlässt das Sparkonto: ein Betrag aus dem Puffer oder ein komplettes Sparziel. */
     WITHDRAWAL
 }

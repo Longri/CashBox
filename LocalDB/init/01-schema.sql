@@ -156,7 +156,8 @@ CREATE TABLE savings_goal_image (
 --  TRANSFER   : source=NULL, target=Ziel   (Puffer -> Sparziel)
 --  TRANSFER   : source=Ziel, target=NULL   (Sparziel -> Puffer)
 --  TRANSFER   : source=A,    target=B      (Sparziel -> Sparziel)
---  WITHDRAWAL : source=Ziel, target=NULL   (Sparziel wird ausgegeben)
+--  WITHDRAWAL : source=NULL, target=NULL   (Betrag aus dem Puffer nach außen)
+--  WITHDRAWAL : source=Ziel, target=NULL   (Sparziel komplett nach außen)
 -- ---------------------------------------------------------------------
 CREATE TABLE booking (
     id              BIGINT          NOT NULL AUTO_INCREMENT,

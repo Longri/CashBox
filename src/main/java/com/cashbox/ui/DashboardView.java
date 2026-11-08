@@ -2,9 +2,7 @@ package com.cashbox.ui;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.List;
 
 import com.cashbox.model.GoalStatus;
 import com.cashbox.service.AccountOverview;
@@ -31,10 +29,10 @@ import com.vaadin.flow.router.RouterLink;
 import jakarta.annotation.security.PermitAll;
 
 /**
- * Startseite: Kontostand, Puffer, Sparziele und der Einstieg in Ein- und Umbuchungen.
+ * Startseite: Kontostand, Puffer, die laufenden Sparziele und der Einstieg in Ein-, Um- und Ausbuchungen.
  * <p>
- * Die Sparziele lassen sich wie auf der Sparziel-Seite am Griff umsortieren ({@link GoalSorting});
- * da hier alle Status in einer Liste stehen, wird jeweils nur innerhalb desselben Status verschoben.
+ * Gezeigt werden nur aktive Sparziele; pausierte und erreichte stehen auf der Sparziel-Seite.
+ * Die Ziele lassen sich wie dort am Griff umsortieren ({@link GoalSorting}).
  */
 @Route("")
 @PageTitle("Übersicht | CashBox")
@@ -66,7 +64,9 @@ public class DashboardView extends VerticalLayout {
         deposit.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         Button transfer = new Button("Umbuchen", VaadinIcon.EXCHANGE.create(), e -> openDialog(BookingDialog.Mode.TRANSFER));
         transfer.setId("transfer");
-        Div actions = new Div(deposit, transfer);
+        Button withdraw = new Button("Ausbuchen", VaadinIcon.MINUS.create(), e -> openDialog(BookingDialog.Mode.WITHDRAWAL));
+        withdraw.setId("withdraw");
+        Div actions = new Div(deposit, transfer, withdraw);
         actions.addClassName("booking-actions");
 
         goalList.addClassName("goal-list");
@@ -109,26 +109,22 @@ public class DashboardView extends VerticalLayout {
 
         goalList.removeAll();
         sorting.clear();
-        if (overview.goals().isEmpty()) {
-            RouterLink create = new RouterLink("Sparziel anlegen", GoalsView.class);
-            create.setId("goals-create-link");
-            Paragraph empty = new Paragraph(new Text("Noch keine Sparziele angelegt. "), create);
+        List<AccountOverview.GoalInfo> active = overview.goals().stream()
+                .filter(goal -> goal.status() == GoalStatus.ACTIVE)
+                .toList();
+        if (active.isEmpty()) {
+            boolean hasGoals = !overview.goals().isEmpty();
+            RouterLink link = new RouterLink(hasGoals ? "Sparziele verwalten" : "Sparziel anlegen", GoalsView.class);
+            link.setId("goals-create-link");
+            Paragraph empty = new Paragraph(
+                    new Text(hasGoals ? "Gerade läuft kein Sparziel. " : "Noch keine Sparziele angelegt. "), link);
             empty.addClassName("goal-list__empty");
             goalList.add(empty);
             return;
         }
-        // Griff nur in Status mit mehreren Zielen; die übrigen bekommen gleich breiten Leerraum,
-        // damit alle Zeilen bündig stehen. Gibt es nirgends etwas zu sortieren, entfällt beides.
-        Map<GoalStatus, Long> perStatus = overview.goals().stream()
-                .collect(Collectors.groupingBy(AccountOverview.GoalInfo::status, Collectors.counting()));
-        boolean anySortable = perStatus.values().stream().anyMatch(count -> count > 1);
-        Function<GoalStatus, GoalSorting.Handle> handleFor = status -> !anySortable
-                ? GoalSorting.Handle.NONE
-                : perStatus.get(status) > 1 ? GoalSorting.Handle.GRIP : GoalSorting.Handle.SPACER;
-
-        overview.goals().forEach(goal -> {
-            Div item = sorting.item(goal.id(), goal.name(), goal.status(), handleFor.apply(goal.status()),
-                    goalRow(goal));
+        GoalSorting.Handle handle = active.size() > 1 ? GoalSorting.Handle.GRIP : GoalSorting.Handle.NONE;
+        active.forEach(goal -> {
+            Div item = sorting.item(goal.id(), goal.name(), goal.status(), handle, goalRow(goal));
             item.addClassName("goal-item--row");
             goalList.add(item);
         });
@@ -140,11 +136,6 @@ public class DashboardView extends VerticalLayout {
         name.addClassName("goal-row__name");
         Div title = new Div(name);
         title.addClassName("goal-row__title");
-        if (!goal.status().acceptsMoney()) {
-            Span badge = new Span(goal.status().getLabel());
-            badge.addClassName("goal-status-badge");
-            title.add(badge);
-        }
         Span amounts = new Span(Money.format(goal.assigned()) + " von " + Money.format(goal.target()));
         amounts.addClassName("goal-row__amounts");
         Div head = new Div(title, amounts);
@@ -157,7 +148,6 @@ public class DashboardView extends VerticalLayout {
         RouterLink row = new RouterLink(GoalsView.class);
         row.add(GoalAvatar.of(goal.id(), goal.icon(), goal.hasImage(), goalService, GoalAvatar.Size.SMALL), body);
         row.addClassNames("goal-row", "goal-row--link");
-        row.setClassName("goal-row--inactive", !goal.status().acceptsMoney());
         return row;
     }
 

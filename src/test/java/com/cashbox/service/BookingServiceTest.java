@@ -1,7 +1,9 @@
 package com.cashbox.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.cashbox.model.Account;
 import com.cashbox.model.Booking;
 import com.cashbox.model.BookingType;
+import com.cashbox.model.GoalStatus;
 import com.cashbox.model.SavingsGoal;
 import com.cashbox.repository.AccountRepository;
 import com.cashbox.repository.BookingRepository;
@@ -108,6 +111,74 @@ class BookingServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.deposit(new BigDecimal("-1"), null, null));
         assertThrows(IllegalArgumentException.class, () -> service.deposit(new BigDecimal("1.005"), null, null));
         assertThrows(IllegalArgumentException.class, () -> service.deposit(BookingService.MAX_AMOUNT, null, null));
+    }
+
+    @Test
+    void withdrawFromBufferReducesBalanceAndBuffer() {
+        service.deposit(eur("100"), null, null);
+        service.withdrawFromBuffer(new BigDecimal("40.5"), "Waschmaschine");
+
+        assertEquals(balanceBefore.add(eur("59.50")), account.getCurrentBalance());
+        assertEquals(bufferBefore.add(eur("59.50")), account.getUnassignedBuffer());
+        Booking booking = allBookings().getFirst();
+        assertEquals(BookingType.WITHDRAWAL, booking.getType());
+        assertEquals(eur("40.50"), booking.getAmount());
+        assertNull(booking.getSourceGoal());
+        assertNull(booking.getTargetGoal());
+        assertEquals("Waschmaschine", booking.getNote());
+    }
+
+    @Test
+    void rejectsBufferWithdrawalBeyondBuffer() {
+        BigDecimal tooMuch = bufferBefore.add(eur("0.01"));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.withdrawFromBuffer(tooMuch, null));
+        assertEquals("Im Puffer ist nicht genug Geld.", ex.getMessage());
+        assertEquals(balanceBefore, account.getCurrentBalance());
+    }
+
+    @Test
+    void withdrawGoalTakesWholeAmountAndMarksItReached() {
+        service.deposit(eur("80"), vacation.getId(), null);
+        service.withdrawGoal(vacation.getId(), eur("80"), true, "Flug gebucht");
+
+        assertEquals(balanceBefore, account.getCurrentBalance());
+        assertEquals(bufferBefore, account.getUnassignedBuffer());
+        assertEquals(0, vacation.getAssignedAmount().signum());
+        assertEquals(GoalStatus.REACHED, vacation.getStatus());
+        Booking booking = allBookings().getFirst();
+        assertEquals(BookingType.WITHDRAWAL, booking.getType());
+        assertEquals(eur("80"), booking.getAmount());
+        assertEquals(vacation.getId(), booking.getSourceGoal().getId());
+        assertNull(booking.getTargetGoal());
+    }
+
+    @Test
+    void withdrawGoalCanKeepStatusAndWorksForPausedGoals() {
+        service.deposit(eur("30"), bike.getId(), null);
+        bike.setStatus(GoalStatus.PAUSED);
+        service.withdrawGoal(bike.getId(), eur("30"), false, null);
+
+        assertEquals(0, bike.getAssignedAmount().signum());
+        assertEquals(GoalStatus.PAUSED, bike.getStatus());
+    }
+
+    @Test
+    void goalCanOnlyBeWithdrawnCompletely() {
+        service.deposit(eur("80"), vacation.getId(), null);
+        int before = allBookings().size();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.withdrawGoal(vacation.getId(), eur("50"), true, null));
+        assertTrue(ex.getMessage().startsWith("Ein Sparziel wird immer komplett ausgebucht."), ex.getMessage());
+        assertTrue(ex.getMessage().contains("80,00\u00a0€"), ex.getMessage());
+        assertEquals(eur("80"), vacation.getAssignedAmount());
+        assertEquals(GoalStatus.ACTIVE, vacation.getStatus());
+        assertEquals(before, allBookings().size());
+
+        IllegalArgumentException empty = assertThrows(IllegalArgumentException.class,
+                () -> service.withdrawGoal(bike.getId(), eur("1"), false, null));
+        assertEquals("Im Sparziel „" + bike.getName() + "“ ist kein Geld mehr.", empty.getMessage());
     }
 
     private List<Booking> allBookings() {

@@ -35,9 +35,7 @@ final class GoalSorting {
         /** Nichts – es gibt nichts zu sortieren. */
         NONE,
         /** Ziehgriff. */
-        GRIP,
-        /** Leerer Platz in Griffbreite, damit ein Eintrag ohne Griff bündig mit den anderen steht. */
-        SPACER
+        GRIP
     }
 
     private final SavingsGoalService service;
@@ -79,11 +77,6 @@ final class GoalSorting {
         item.getElement().setAttribute("data-sort-group", status.name());
         switch (handle) {
             case GRIP -> item.add(grip(goalId, goalName));
-            case SPACER -> {
-                Div spacer = new Div();
-                spacer.addClassName("goal-item__spacer");
-                item.add(spacer);
-            }
             case NONE -> {
                 // kein linker Rand
             }

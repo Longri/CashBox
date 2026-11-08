@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -21,7 +22,7 @@ import com.cashbox.repository.SavingsGoalImageRepository;
 import com.cashbox.repository.SavingsGoalRepository;
 
 /**
- * Ein- und Umbuchungen. Jede Buchung wird als unveränderlicher {@link Booking}-Eintrag
+ * Ein-, Um- und Ausbuchungen. Jede Buchung wird als unveränderlicher {@link Booking}-Eintrag
  * protokolliert; nach jeder Änderung wird die Konto-Invariante geprüft
  * (Kontostand = Puffer + Summe der Sparziele), sonst wird die Transaktion zurückgerollt.
  */
@@ -113,6 +114,55 @@ public class BookingService {
         }
         bookings.save(new Booking(account, BookingType.TRANSFER, value, source, target, text, Instant.now()));
         verifyConsistency(account);
+    }
+
+    /** Einen beliebigen Betrag aus dem Puffer ausbuchen: Das Geld verlässt das Sparkonto. */
+    @Transactional
+    public void withdrawFromBuffer(BigDecimal amount, String note) {
+        BigDecimal value = normalizeAmount(amount);
+        String text = normalizeNote(note);
+        Account account = loadAccount();
+
+        account.takeFromBuffer(value);
+        account.withdraw(value);
+        bookings.save(new Booking(account, BookingType.WITHDRAWAL, value, null, null, text, Instant.now()));
+        verifyConsistency(account);
+    }
+
+    /**
+     * Ein Sparziel komplett ausbuchen (z. B. weil das Geld ausgegeben wurde). Teilbeträge gibt es
+     * bewusst nicht – dafür erst in den Puffer umbuchen. Der Status spielt keine Rolle:
+     * Auch pausierte und erreichte Ziele lassen sich ausbuchen.
+     *
+     * @param expectedAmount der Betrag, den der Benutzer gesehen hat; weicht der aktuelle Betrag
+     *                       des Ziels ab (zwischenzeitlich gebucht), wird nichts verändert
+     * @param markReached    Ziel danach auf {@link GoalStatus#REACHED} setzen
+     */
+    @Transactional
+    public void withdrawGoal(Long goalId, BigDecimal expectedAmount, boolean markReached, String note) {
+        BigDecimal value = normalizeAmount(expectedAmount);
+        String text = normalizeNote(note);
+        Account account = loadAccount();
+        SavingsGoal source = loadGoal(account, Objects.requireNonNull(goalId, "goalId"));
+        if (source.getAssignedAmount().compareTo(value) != 0) {
+            throw new IllegalArgumentException(source.getAssignedAmount().signum() == 0
+                    ? "Im Sparziel „" + source.getName() + "“ ist kein Geld mehr."
+                    : "Ein Sparziel wird immer komplett ausgebucht. In „" + source.getName() + "“ sind jetzt "
+                            + formatEuro(source.getAssignedAmount()) + " – bitte den Dialog neu öffnen.");
+        }
+
+        source.release(value);
+        account.withdraw(value);
+        if (markReached) {
+            source.setStatus(GoalStatus.REACHED);
+        }
+        bookings.save(new Booking(account, BookingType.WITHDRAWAL, value, source, null, text, Instant.now()));
+        verifyConsistency(account);
+    }
+
+    /** Wie {@code Money.format} in der Oberfläche: {@code "1.234,50 €"}. */
+    private static String formatEuro(BigDecimal amount) {
+        return String.format(Locale.GERMANY, "%,.2f\u00a0€", amount);
     }
 
     private Account loadAccount() {

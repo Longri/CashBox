@@ -47,7 +47,7 @@ import com.vaadin.flow.data.binder.Binder;
  *     {@link GoalImageCropDialog}. Gespeichert wird erst mit dem Ziel.</li>
  * <li><b>Bearbeiten:</b> zusätzlich Status und – nur für leere Ziele ohne Buchungen – Löschen.</li>
  * </ul>
- * Geld wird hier nie bewegt; dafür gibt es Ein- und Umbuchen in der Übersicht.
+ * Geld wird hier nie bewegt; dafür gibt es Ein-, Um- und Ausbuchen in der Übersicht.
  * Auf schmalen Bildschirmen per CSS als Vollbild (Klasse {@code form-dialog}).
  */
 public class GoalDialog extends Dialog {
@@ -204,7 +204,7 @@ public class GoalDialog extends Dialog {
         status.setItems(GoalStatus.values());
         status.setItemLabelGenerator(GoalStatus::getLabel);
         status.setHelperText("Nur aktive Ziele bekommen neues Geld. Aus pausierten und erreichten Zielen "
-                + "kannst du weiterhin umbuchen.");
+                + "kannst du weiterhin um- und ausbuchen.");
     }
 
     private void bindFields() {

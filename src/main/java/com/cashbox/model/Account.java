@@ -59,4 +59,15 @@ public class Account {
         }
         unassignedBuffer = unassignedBuffer.subtract(amount);
     }
+
+    /**
+     * Geld verlässt das Konto. Ändert nur den Kontostand – der Betrag muss vorher aus dem Puffer
+     * ({@link #takeFromBuffer}) oder einem Sparziel ({@link SavingsGoal#release}) genommen werden.
+     */
+    public void withdraw(BigDecimal amount) {
+        if (currentBalance.compareTo(amount) < 0) {
+            throw new IllegalArgumentException("Auf dem Konto ist nicht genug Geld.");
+        }
+        currentBalance = currentBalance.subtract(amount);
+    }
 }

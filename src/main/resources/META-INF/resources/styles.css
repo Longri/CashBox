@@ -50,6 +50,13 @@
   flex: 1 1 10rem;
 }
 
+/* Handy: Einbuchen über die volle Breite, Um- und Ausbuchen nebeneinander darunter */
+@media (max-width: 600px) {
+  .booking-actions vaadin-button[theme~="primary"] {
+    flex-basis: 100%;
+  }
+}
+
 .goal-list {
   display: flex;
   flex-direction: column;
@@ -105,19 +112,6 @@
 .goal-row__body {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-.goal-row--inactive {
-  opacity: 0.6;
-}
-
-.goal-status-badge {
-  padding: 0 var(--lumo-space-xs);
-  border-radius: var(--lumo-border-radius-s);
-  background: var(--lumo-contrast-10pct);
-  color: var(--lumo-secondary-text-color);
-  font-size: var(--lumo-font-size-xs);
-  font-weight: 500;
 }
 
 .section-header {
@@ -178,16 +172,9 @@
   border-radius: var(--lumo-border-radius-m) 0 0 var(--lumo-border-radius-m);
 }
 
-.goal-item--row > .goal-item__handle + .goal-row--link,
-.goal-item--row > .goal-item__spacer + .goal-row--link {
+.goal-item--row > .goal-item__handle + .goal-row--link {
   padding-left: 0;
   border-radius: 0 var(--lumo-border-radius-m) var(--lumo-border-radius-m) 0;
-}
-
-/* Leerraum in Griffbreite für Einträge, die allein in ihrem Status sind */
-.goal-item__spacer {
-  flex: none;
-  width: 2.5rem;
 }
 
 /* Ziehgriff: natives <button> mit sechs Punkten */
@@ -627,6 +614,16 @@ vaadin-dialog.form-dialog::part(overlay) {
   font-size: var(--lumo-font-size-xl);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* Schmale Handys: Symbol über dem Text, damit alle drei Reiter ungekürzt hineinpassen */
+@media (max-width: 480px) {
+  .booking-mode-tabs vaadin-tab {
+    flex-direction: column;
+    gap: 0;
+    padding-inline: var(--lumo-space-xs);
+    font-size: var(--lumo-font-size-s);
+  }
 }
 
 .booking-swap {
