@@ -21,10 +21,11 @@ public class MainLayout extends AppLayout {
 
     public MainLayout(AuthenticationContext auth) {
         H1 title = new H1("CashBox");
+        title.addClassName("navbar-title");
         title.getStyle().set("font-size", "var(--lumo-font-size-l)").set("margin", "0");
         Button logout = new Button("Abmelden (" + auth.getPrincipalName().orElse("?") + ")", e -> auth.logout());
         logout.getStyle().set("margin-left", "auto").set("margin-right", "var(--lumo-space-m)");
-        addToNavbar(new DrawerToggle(), title, logout);
+        addToNavbar(new DrawerToggle(), AppLogo.create("navbar-logo"), title, logout);
 
         SideNav nav = new SideNav();
         nav.addItem(new SideNavItem("Übersicht", DashboardView.class, VaadinIcon.DASHBOARD.create()));

@@ -107,6 +107,19 @@ cashbox.example.de {
 }
 ```
 
+### 6. Als App auf den Home-Bildschirm legen
+CashBox bringt ein Web-App-Manifest und ein Icon mit. Auf dem iPhone geht das in Safari und,
+ab iOS 16.4, auch in Chrome: Teilen-Symbol → „Zum Home-Bildschirm“ → „Hinzufügen“. Ab iOS 26
+den Schalter „Als Web-App öffnen“ eingeschaltet lassen. Das Icon öffnet CashBox dann ohne
+Adressleiste. Auf Android steht im Chrome-Menü „App installieren“ oder „Zum Startbildschirm
+hinzufügen“.
+
+Voraussetzung ist HTTPS (siehe 5.), denn Browser behandeln eine Seite nur über HTTPS als
+vollwertige Web-App.
+
+Die App vom Home-Bildschirm hat eigene Cookies, getrennt vom Browser. Man meldet sich dort
+also einmal an und bleibt dann so lange angemeldet, wie `REMEMBER_ME_DAYS` angibt.
+
 ## Betrieb
 Alle Befehle im Ordner mit der `docker-compose.yml` ausführen.
 

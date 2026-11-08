@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import com.vaadin.browserless.SpringBrowserlessTest;
+import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.login.LoginForm;
 
 @SpringBootTest
@@ -17,6 +19,13 @@ class LoginViewTest extends SpringBrowserlessTest {
     void anonymousSeesLoginForm() {
         navigate(LoginView.class);
         assertEquals("login", $(LoginForm.class).single().getAction());
+    }
+
+    @Test
+    void showsLogoAboveName() {
+        navigate(LoginView.class);
+        assertEquals(AppLogo.SRC, $(Image.class).single().getSrc());
+        assertEquals("CashBox", $(H1.class).single().getText());
     }
 
     @Test

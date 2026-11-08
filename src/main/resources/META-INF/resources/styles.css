@@ -13,6 +13,40 @@
   width: 100%;
 }
 
+/* ------------------------------------------------------------------ Logo (AppLogo) */
+
+/* Kopfleiste: Logo vor „CashBox“, auf jeder Seite. Die SVG hat innen etwas Rand. */
+.navbar-logo {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-inline-end: 4px;
+}
+
+/* Handy: Nur das Logo zeigt die App, sonst schiebt ein längerer Benutzername den Abmelden-Button
+   aus dem Bild. Der Name bleibt für Screenreader lesbar. */
+@media (max-width: 600px) {
+  .navbar-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* Anmeldeseite: Logo groß über dem Namen */
+.login-logo {
+  flex: none;
+  width: 128px;
+  height: 128px;
+}
+
+.login-title {
+  margin: 0;
+}
+
 /* ------------------------------------------------------------------ Übersicht */
 
 .dashboard-title {

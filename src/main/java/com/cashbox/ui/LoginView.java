@@ -40,7 +40,8 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
         login.setForgotPasswordButtonVisible(false);
 
         H1 title = new H1("CashBox");
-        add(title, login);
+        title.addClassName("login-title");
+        add(AppLogo.create("login-logo"), title, login);
     }
 
     @Override
