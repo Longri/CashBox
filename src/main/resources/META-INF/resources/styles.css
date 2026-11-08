@@ -1,4 +1,12 @@
 /* Globale Styles für CashBox */
+
+/* Akzentfarben (AccentColor) für beide Themes; Blau definiert jedes Theme selbst
+   (theme-lumo.css, theme-aura.css). Hell genug für weiße Schrift auf Buttons. */
+[data-accent="purple"] { --cashbox-accent: oklch(0.53 0.22 295); }
+[data-accent="green"] { --cashbox-accent: oklch(0.55 0.15 150); }
+[data-accent="orange"] { --cashbox-accent: oklch(0.6 0.18 45); }
+[data-accent="red"] { --cashbox-accent: oklch(0.55 0.21 25); }
+
 .page-content {
   margin: 0 auto;
   max-width: 60rem;
@@ -333,6 +341,15 @@ html.goal-sorting * {
 .settings-option__icon {
   width: 1em;
   height: 1em;
+}
+
+/* Farbmuster vor dem Namen der Akzentfarbe; data-accent setzt --cashbox-accent */
+.accent-swatch {
+  flex: none;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  background: var(--cashbox-accent);
 }
 
 /* ------------------------------------------------------------------ Sparziel-Symbol */

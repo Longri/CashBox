@@ -1,0 +1,8 @@
+/*
+ * Kompakte Ansicht mit Aura (siehe ThemeFamily.AURA): Aura berechnet Abstände und
+ * Schriftgrößen aus diesen Grundwerten (Vorgabe 16 bzw. 14).
+ */
+:root {
+  --aura-base-size: 12;
+  --aura-base-font-size: 13;
+}

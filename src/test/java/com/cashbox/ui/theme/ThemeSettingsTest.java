@@ -21,27 +21,34 @@ class ThemeSettingsTest {
     void withoutCookiesUsesDefault() {
         assertEquals(ThemeSettings.DEFAULT, ThemeSettings.of(request()));
         assertEquals(ThemeSettings.DEFAULT, ThemeSettings.of(null));
-        assertEquals(new ThemeSettings(ThemeFamily.LUMO, ColorMode.SYSTEM), ThemeSettings.DEFAULT);
+        assertEquals(new ThemeSettings(ThemeFamily.LUMO, ColorMode.SYSTEM, AccentColor.BLUE, false),
+                ThemeSettings.DEFAULT);
     }
 
     @Test
-    void readsBothCookies() {
+    void readsAllCookies() {
         ThemeSettings settings = ThemeSettings.of(request(
                 new Cookie("other", "x"),
                 new Cookie("cashbox-theme", "aura"),
-                new Cookie("cashbox-color-mode", "system")));
+                new Cookie("cashbox-color-mode", "dark"),
+                new Cookie("cashbox-accent", "green"),
+                new Cookie("cashbox-density", "compact")));
 
-        assertEquals(new ThemeSettings(ThemeFamily.AURA, ColorMode.SYSTEM), settings);
+        assertEquals(new ThemeSettings(ThemeFamily.AURA, ColorMode.DARK, AccentColor.GREEN, true), settings);
     }
 
     @Test
     void unknownValuesFallBackToDefault() {
-        assertEquals(new ThemeSettings(ThemeFamily.LUMO, ColorMode.DARK), ThemeSettings.of(request(
+        assertEquals(ThemeSettings.DEFAULT, ThemeSettings.of(request(
                 new Cookie("cashbox-theme", "material"),
-                new Cookie("cashbox-color-mode", "dark"))));
-        assertEquals(new ThemeSettings(ThemeFamily.AURA, ColorMode.SYSTEM), ThemeSettings.of(request(
-                new Cookie("cashbox-theme", "aura"),
-                new Cookie("cashbox-color-mode", "sepia"))));
+                new Cookie("cashbox-color-mode", "sepia"),
+                new Cookie("cashbox-accent", "<script>"),
+                new Cookie("cashbox-density", "tiny"))));
+        assertEquals(new ThemeSettings(ThemeFamily.LUMO, ColorMode.DARK, AccentColor.BLUE, false),
+                ThemeSettings.of(request(
+                        new Cookie("cashbox-theme", "material"),
+                        new Cookie("cashbox-color-mode", "dark"),
+                        new Cookie("cashbox-density", "normal"))));
     }
 
     @Test
@@ -52,27 +59,45 @@ class ThemeSettingsTest {
                   <link rel="stylesheet" href="./styles.css">
                 </head><body></body></html>""");
 
-        new ThemeSettings(ThemeFamily.AURA, ColorMode.DARK).applyTo(document);
+        new ThemeSettings(ThemeFamily.AURA, ColorMode.DARK, AccentColor.PURPLE, false).applyTo(document);
 
-        List<String> order = document.head().children().stream()
-                .map(e -> e.is("base") ? "base" : e.attr("href"))
-                .toList();
-        assertEquals(List.of("base", "aura/aura.css", "aura-compat.css", "./styles.css"), order);
+        assertEquals(List.of("base", "aura/aura.css", "theme-aura.css", "./styles.css"), headOrder(document));
         Element html = document.head().parent();
         assertEquals("dark", html.attr("theme"));
         assertEquals("color-scheme: dark;", html.attr("style"));
+        assertEquals("purple", html.attr("data-accent"));
+    }
+
+    @Test
+    void compactLoadsThePresetOfTheTheme() {
+        Document lumo = Jsoup.parse("<html><head><link rel=\"stylesheet\" href=\"./styles.css\"></head></html>");
+        new ThemeSettings(ThemeFamily.LUMO, ColorMode.LIGHT, AccentColor.BLUE, true).applyTo(lumo);
+        assertEquals(List.of("lumo/lumo.css", "theme-lumo.css", "lumo/presets/compact.css", "./styles.css"),
+                headOrder(lumo));
+        // Die Einstellungsseite findet den Link über seine ID, um ihn live zu entfernen
+        assertEquals("lumo/presets/compact.css", lumo.getElementById("cashbox-compact").attr("href"));
+
+        Document aura = Jsoup.parse("<html><head></head></html>");
+        new ThemeSettings(ThemeFamily.AURA, ColorMode.LIGHT, AccentColor.BLUE, true).applyTo(aura);
+        assertEquals(List.of("aura/aura.css", "theme-aura.css", "theme-aura-compact.css"), headOrder(aura));
     }
 
     @Test
     void automaticColorModeLetsTheBrowserDecide() {
         Document document = Jsoup.parse("<html style=\"height: 100%\"><head></head><body></body></html>");
 
-        new ThemeSettings(ThemeFamily.LUMO, ColorMode.SYSTEM).applyTo(document);
+        new ThemeSettings(ThemeFamily.LUMO, ColorMode.SYSTEM, AccentColor.BLUE, false).applyTo(document);
 
         Element html = document.head().parent();
         assertEquals("light-dark", html.attr("theme"));
         assertEquals("height: 100%; color-scheme: light dark;", html.attr("style"));
-        assertEquals("lumo/lumo.css", document.head().selectFirst("link[rel=stylesheet]").attr("href"));
+        assertEquals(List.of("lumo/lumo.css", "theme-lumo.css"), headOrder(document));
+    }
+
+    private static List<String> headOrder(Document document) {
+        return document.head().children().stream()
+                .map(e -> e.is("base") ? "base" : e.attr("href"))
+                .toList();
     }
 
     private static VaadinRequest request(Cookie... cookies) {

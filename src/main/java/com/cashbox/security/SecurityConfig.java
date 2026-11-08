@@ -31,10 +31,10 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http, RememberMeProperties rememberMe,
             AppUserDetailsService userDetailsService, PersistentTokenRepository tokenRepository) throws Exception {
         // Eigene statische Dateien aus META-INF/resources. styles.css, Lumo und Aura gibt Vaadin selbst frei;
-        // aura-compat.css braucht schon die Anmeldeseite, wenn dort Aura gewählt ist.
+        // die theme-*.css (siehe ThemeFamily) braucht schon die Anmeldeseite.
         // Muss vor der Vaadin-Konfiguration stehen, die alle übrigen Anfragen absichert.
         http.authorizeHttpRequests(auth -> auth
-                .requestMatchers("/goal-sort.js", "/image-cropper.js", "/aura-compat.css").permitAll());
+                .requestMatchers("/goal-sort.js", "/image-cropper.js", "/theme-*.css").permitAll());
         if (rememberMe.isEnabled()) {
             PersistentTokenBasedRememberMeServices rememberMeServices =
                     rememberMeServices(rememberMe, userDetailsService, tokenRepository);

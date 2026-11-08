@@ -1,0 +1,20 @@
+/*
+ * Nur zusammen mit Lumo geladen (siehe ThemeFamily.LUMO).
+ *
+ * Akzentfarbe (Attribut data-accent am <html>, siehe AccentColor). Die Farben stehen in
+ * styles.css; hier werden Lumos Primärfarben daraus abgeleitet. Blau ist Lumos eigene
+ * Farbe und bleibt unverändert.
+ */
+[data-accent="blue"] {
+  --cashbox-accent: light-dark(#006af5, #0c6ce9);
+}
+
+html[data-accent]:not([data-accent="blue"]) {
+  --lumo-primary-color: var(--cashbox-accent);
+  --lumo-primary-color-50pct: color-mix(in srgb, var(--cashbox-accent) 75%, transparent);
+  --lumo-primary-color-10pct: color-mix(in srgb, var(--cashbox-accent) 13%, transparent);
+  /* Text in der Akzentfarbe: hell etwas dunkler, dunkel deutlich heller, damit er lesbar bleibt */
+  --lumo-primary-text-color: light-dark(
+    oklch(from var(--cashbox-accent) calc(l - 0.04) c h),
+    oklch(from var(--cashbox-accent) calc(l + 0.22) calc(c * 0.75) h));
+}

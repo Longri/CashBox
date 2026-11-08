@@ -1,9 +1,12 @@
 /*
  * Nur zusammen mit Aura geladen (siehe ThemeFamily.AURA).
- *
- * styles.css und einige Views bauen auf den Lumo-Variablen auf. Aura definiert sie nicht,
+ */
+
+/*
+ * Lumo-Variablen: styles.css und einige Views bauen darauf auf. Aura definiert sie nicht,
  * darum werden hier genau die benutzten auf Aura-Werte abgebildet. Farben laufen über
- * Auras light-dark()-Werte und passen so zu hell, dunkel und automatisch.
+ * Auras light-dark()-Werte und passen so zu hell, dunkel und automatisch; Abstände und
+ * Schrift folgen Auras Grundgrößen und damit auch der kompakten Ansicht.
  */
 :root {
   /* Abstände */
@@ -49,4 +52,17 @@
   --lumo-success-color-10pct: color-mix(in srgb, var(--aura-green) 10%, transparent);
   --lumo-warning-text-color: var(--aura-orange-text);
   --lumo-warning-color-10pct: color-mix(in srgb, var(--aura-orange) 10%, transparent);
+}
+
+/*
+ * Akzentfarbe (Attribut data-accent am <html>, siehe AccentColor). Die übrigen Farben stehen
+ * in styles.css; Aura leitet Text- und Kontrastfarben selbst daraus ab.
+ */
+[data-accent="blue"] {
+  --cashbox-accent: var(--aura-blue);
+}
+
+html[data-accent] {
+  --aura-accent-color-light: var(--cashbox-accent);
+  --aura-accent-color-dark: var(--cashbox-accent);
 }
